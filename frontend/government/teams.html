@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Response Squads — Government Portal</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header class="app-navbar"></header>
+    
+    <div class="portal-layout">
+        <aside class="sidebar"></aside>
+        
+        <main class="portal-content">
+            <div style="margin-bottom: 20px;">
+                <h2 style="font-size: 24px; font-weight: 800;">City-Wide Response Squads</h2>
+                <p style="color: var(--text-secondary); font-size: 13px;">Monitor deployment statuses of all rescue forces and dispatch squads mapped to verified NGOs.</p>
+            </div>
+
+            <!-- Table of teams -->
+            <div class="glass-panel" style="padding: 20px;">
+                <h3 style="font-size: 15px; margin-bottom: 12px; font-weight: 700; border-bottom: 1.5px solid var(--border-color); padding-bottom: 8px;">
+                    <i class="fa-solid fa-helmet-safety" style="color: var(--color-primary-light);"></i> Active Squad Deployment Matrix
+                </h3>
+                <div id="teams-table-container">
+                    <div style="text-align: center; color: var(--text-muted); padding: 40px;">
+                        <i class="fa-solid fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 10px;"></i>
+                        <p>Loading rescue teams...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'gov') {
+                window.location.href = '/login.html?role=gov';
+                return;
+            }
+            
+            components.renderNavbar("Response Squads");
+            components.renderSidebar("/government/teams.html");
+            
+            await loadAllTeams();
+        });
+
+        async function loadAllTeams() {
+            try {
+                const list = await api.request('/api/gov/teams');
+                
+                const cols = [
+                    { title: "Squad ID", field: "id", render: (val) => `<b>#${val}</b>` },
+                    { title: "Team Squad Name", field: "team_name", render: (val) => `<strong>${val}</strong>` },
+                    { title: "Affiliated NGO Agency", field: "ngo_name", render: (val) => `<b>${val}</b>` },
+                    { title: "Headcount Size", field: "members_count", render: (val) => `${val} volunteers` },
+                    { title: "Current Status", field: "status", render: (val) => {
+                        let badgeClass = 'role-citizen';
+                        if (val === 'deployed') badgeClass = 'role-ngo';
+                        if (val === 'offline') badgeClass = 'role-gov';
+                        return `<span class="user-badge ${badgeClass}">${val.toUpperCase()}</span>`;
+                    }}
+                ];
+                
+                components.renderDataTable('teams-table-container', cols, list);
+            } catch(e) {
+                console.error(e);
+            }
+        }
+    </script>
+</body>
+</html>

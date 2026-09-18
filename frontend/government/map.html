@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Command Map — Government Portal</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Leaflet.js -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+    <header class="app-navbar"></header>
+    
+    <div class="portal-layout">
+        <aside class="sidebar"></aside>
+        
+        <main class="portal-content" style="padding:0; position:relative; height:calc(100vh - 65px);">
+            <!-- Map Layers Toggles Overlay -->
+            <div class="map-overlay-controls" style="background: white; border: 1px solid var(--border-color); box-shadow: var(--shadow-md);">
+                <h4 style="font-size: 11px; margin-bottom: 8px; border-bottom: 1.5px solid var(--border-color); padding-bottom: 4px; color: var(--color-primary); font-weight:700;">COMMAND LAYERS</h4>
+                <label class="control-item" style="display:flex; align-items:center; gap:6px; font-size:12px; margin-bottom:6px;">
+                    <input type="checkbox" id="layer-sos" checked onchange="toggleGovLayer('sos', this.checked)"> Citizens SOS Alerts
+                </label>
+                <label class="control-item" style="display:flex; align-items:center; gap:6px; font-size:12px; margin-bottom:6px;">
+                    <input type="checkbox" id="layer-shelters" checked onchange="toggleGovLayer('shelters', this.checked)"> Relief Shelters
+                </label>
+                <label class="control-item" style="display:flex; align-items:center; gap:6px; font-size:12px; margin-bottom:6px;">
+                    <input type="checkbox" id="layer-hospitals" checked onchange="toggleGovLayer('hospitals', this.checked)"> Hospitals / Clinics
+                </label>
+                <div class="user-badge" style="background: rgba(220, 38, 38, 0.1); color: var(--color-critical); border-color: var(--color-critical); font-size: 9px; font-weight: 800; display: block; margin-top: 10px; text-align:center;">
+                    DEMO TRACKING radar active
+                </div>
+            </div>
+
+            <div id="map" style="height: 100%; width:100%;"></div>
+        </main>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script src="/js/map.js"></script>
+    <script>
+        let mapInstance;
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'gov') {
+                window.location.href = '/login.html?role=gov';
+                return;
+            }
+            
+            components.renderNavbar("Command Map");
+            components.renderSidebar("/government/map.html");
+            
+            mapInstance = initMap('map');
+            
+            await loadGovMapLayers();
+        });
+
+        async function loadGovMapLayers() {
+            try {
+                // 1. Fetch citizen SOS list
+                const soses = await api.request('/api/gov/sos');
+                updateSOSMarkers(soses);
+                
+                // 2. Fetch shelters list
+                const shelters = await api.request('/api/citizen/shelters');
+                updateShelterMarkers(shelters);
+                
+                // 3. Fetch hospitals list
+                const hospitals = await api.request('/api/citizen/hospitals');
+                updateHospitalMarkers(hospitals);
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        function toggleGovLayer(layerName, show) {
+            toggleLayer(layerName, show);
+        }
+    </script>
+</body>
+</html>

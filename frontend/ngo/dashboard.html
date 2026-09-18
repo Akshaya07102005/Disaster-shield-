@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NGO Dashboard — Disaster Shield AI</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header class="app-navbar"></header>
+    
+    <div class="portal-layout">
+        <aside class="sidebar"></aside>
+        
+        <main class="portal-content">
+            <div style="margin-bottom: 20px;">
+                <h2 style="font-size: 24px; font-weight: 800;">NGO Operations Dashboard</h2>
+                <p style="color: var(--text-secondary); font-size: 13px;">Manage emergency rescue squads, track active evacuation missions, and update distribution stocks.</p>
+            </div>
+
+            <!-- KPI Cards -->
+            <div class="shared-grid" style="margin-bottom: 24px;">
+                <div class="glass-panel" style="border-top: 4px solid var(--color-critical);">
+                    <div style="font-size: 11px; color: var(--text-secondary); font-weight:700; text-transform:uppercase;">Active Missions</div>
+                    <div style="font-size: 28px; font-weight: 800; margin: 4px 0;" id="kpi-active-missions">0</div>
+                </div>
+                <div class="glass-panel" style="border-top: 4px solid var(--color-info);">
+                    <div style="font-size: 11px; color: var(--text-secondary); font-weight:700; text-transform:uppercase;">Rescue Squads</div>
+                    <div style="font-size: 28px; font-weight: 800; margin: 4px 0;" id="kpi-active-teams">0</div>
+                </div>
+                <div class="glass-panel" style="border-top: 4px solid var(--color-low);">
+                    <div style="font-size: 11px; color: var(--text-secondary); font-weight:700; text-transform:uppercase;">Workload Capacity</div>
+                    <div style="font-size: 28px; font-weight: 800; margin: 4px 0;" id="kpi-workload-limit">0 / 5</div>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px;">
+                <!-- Left: Missions Checklist -->
+                <div class="glass-panel" style="display:flex; flex-direction:column;">
+                    <h3 style="font-size: 15px; margin-bottom: 12px; font-weight: 700; border-bottom: 1.5px solid var(--border-color); padding-bottom: 8px;">
+                        <i class="fa-solid fa-truck-pickup" style="color: var(--color-critical);"></i> Assigned Rescue Missions
+                    </h3>
+                    <div id="missions-list" style="flex: 1; display:flex; flex-direction:column; gap:12px;">
+                        <div style="text-align: center; color: var(--text-secondary); padding: 30px;">
+                            <i class="fa-solid fa-spinner fa-spin" style="font-size: 20px; margin-bottom: 8px;"></i>
+                            <p>Loading assigned operations...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Quick actions and Alert Feed -->
+                <div style="display: flex; flex-direction: column; gap: 20px;">
+                    <div class="glass-panel">
+                        <h3 style="font-size: 15px; margin-bottom: 12px; font-weight: 700;">Quick Actions</h3>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <a href="/ngo/members.html" class="btn btn-secondary" style="font-size:11px; padding: 12px 6px;"><i class="fa-solid fa-address-book"></i> Members (20k)</a>
+                            <a href="/ngo/teams.html" class="btn btn-secondary" style="font-size:11px; padding: 12px 6px;"><i class="fa-solid fa-users"></i> Form Squad</a>
+                            <a href="/ngo/food-analysis.html" class="btn btn-secondary" style="font-size:11px; padding: 12px 6px;"><i class="fa-solid fa-bowl-rice"></i> Food Stocks</a>
+                            <a href="/ngo/map.html" class="btn btn-secondary" style="font-size:11px; padding: 12px 6px;"><i class="fa-solid fa-map-location-dot"></i> Live Map</a>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel">
+                        <h3 style="font-size: 15px; margin-bottom: 12px; font-weight: 700; color: var(--color-primary);"><i class="fa-solid fa-bell"></i> Broadcast Advisories</h3>
+                        <div id="advisory-list" style="font-size:12px; color: var(--text-secondary);">
+                            No warnings issued recently.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'ngo') {
+                window.location.href = '/login.html?role=ngo';
+                return;
+            }
+            
+            components.renderNavbar("NGO Dashboard");
+            components.renderSidebar("/ngo/dashboard.html");
+            
+            await loadNgoDashboard();
+        });
+
+        async function loadNgoDashboard() {
+            try {
+                // 1. Fetch missions
+                const list = await api.request('/api/ngo/missions');
+                const activeMissions = list.filter(m => m.status !== 'completed');
+                
+                document.getElementById('kpi-active-missions').innerText = activeMissions.length;
+                
+                // Render checklist
+                const mContainer = document.getElementById('missions-list');
+                mContainer.innerHTML = '';
+                
+                if (list.length === 0) {
+                    mContainer.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--text-secondary);">No rescue missions currently assigned to your team.</div>`;
+                } else {
+                    list.slice(0, 5).forEach(m => {
+                        const div = document.createElement('div');
+                        div.className = 'glass-panel';
+                        div.style.padding = '12px';
+                        div.style.borderLeft = m.status === 'completed' ? '4px solid var(--color-success)' : '4px solid var(--color-critical)';
+                        
+                        div.innerHTML = `
+                            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                                <strong>Mission #${m.id} — ${m.sos_details.emergency_type}</strong>
+                                <span class="user-badge" style="background:rgba(194,43,43,0.06); color:var(--color-critical); border-color:transparent; font-size:10px;">${m.status.toUpperCase()}</span>
+                            </div>
+                            <p style="font-size:11px; color: var(--text-secondary); margin-bottom:4px;">Location: ${m.sos_details.area_name} | People Affected: ${m.sos_details.people_affected}</p>
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+                                <span style="font-size:10px; color: var(--text-muted);">Assigned: ${new Date(m.assigned_at).toLocaleTimeString()}</span>
+                                <a href="/ngo/map.html?mission_id=${m.id}" class="btn btn-secondary" style="width:auto; padding:4px 8px; font-size:10px;">Track Route</a>
+                            </div>
+                        `;
+                        mContainer.appendChild(div);
+                    });
+                }
+                
+                // 2. Fetch workload capacity
+                const cap = await api.request('/api/ngo/capacity');
+                document.getElementById('kpi-workload-limit').innerText = `${cap.active_missions_count} / ${cap.max_concurrent_missions}`;
+                
+                // 3. Fetch active team counts
+                const teams = await api.request('/api/ngo/teams');
+                document.getElementById('kpi-active-teams').innerText = teams.length;
+            } catch(e) {
+                console.error(e);
+            }
+        }
+    </script>
+</body>
+</html>

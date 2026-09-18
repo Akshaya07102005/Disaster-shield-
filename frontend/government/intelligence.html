@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Decision Intelligence — Government Portal</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header class="app-navbar"></header>
+    
+    <div class="portal-layout">
+        <aside class="sidebar"></aside>
+        
+        <main class="portal-content">
+            <div style="margin-bottom: 16px;">
+                <h2 style="font-size: 24px; font-weight: 800;"><i class="fa-solid fa-wand-magic-sparkles" style="color:var(--color-info);"></i> AI Command Decision Support Center</h2>
+                <p style="color: var(--text-secondary); font-size: 13px;">Leverage predictive AI priority triage, weather simulations, and 40 standard disaster guidelines. Labeled for human verification support only.</p>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; height: calc(100vh - 170px);">
+                <!-- Left: AI Intelligence Chat Panel -->
+                <div id="gov-ai-chat-container" style="height: 100%; display: flex; flex-direction: column;"></div>
+
+                <!-- Right: Categorized 40 Questions Explorer & Triage Rules -->
+                <div class="glass-panel" style="overflow-y: auto; height: 100%; display:flex; flex-direction:column; padding:16px;">
+                    <!-- Tab Switcher -->
+                    <div style="display: flex; gap: 8px; margin-bottom: 14px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                        <button id="tab-btn-questions" class="btn btn-primary" style="font-size: 11px; padding: 6px 12px; width: auto;">
+                            <i class="fa-solid fa-list-check"></i> 40 Default Questions
+                        </button>
+                        <button id="tab-btn-rules" class="btn btn-outline" style="font-size: 11px; padding: 6px 12px; width: auto;">
+                            <i class="fa-solid fa-calculator"></i> Triage Rules
+                        </button>
+                    </div>
+
+                    <!-- Tab 1: 40 Default Questions List -->
+                    <div id="view-questions" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;">
+                        <div style="font-size: 12px; color: var(--text-secondary);">
+                            Click any of the 40 questions to evaluate operational protocols:
+                        </div>
+                        <div id="side-questions-list" style="display: flex; flex-direction: column; gap: 6px;"></div>
+                    </div>
+
+                    <!-- Tab 2: Triage Rules -->
+                    <div id="view-rules" style="flex: 1; overflow-y: auto; display: none; flex-direction: column; gap: 12px;">
+                        <div style="font-size:12px; color: var(--text-secondary); line-height: 1.6; display:flex; flex-direction:column; gap:12px;">
+                            <div style="background:#F8FAFC; padding:10px; border-radius:4px; border-left:3px solid var(--color-critical);">
+                                <strong>Headcount Multiplier (Weight: 40%):</strong>
+                                <p style="margin-top:2px;">Distress calls with children, injured, or elderly occupants gain scaling multipliers up to +15 priority points.</p>
+                            </div>
+                            <div style="background:#F8FAFC; padding:10px; border-radius:4px; border-left:3px solid var(--color-high);">
+                                <strong>Terrain Risk Factors (Weight: 35%):</strong>
+                                <p style="margin-top:2px;">Low elevation sectors (< 5m above sea level) or zones near rivers gain +10 priority points during rainfall.</p>
+                            </div>
+                            <div style="background:#F8FAFC; padding:10px; border-radius:4px; border-left:3px solid var(--color-info);">
+                                <strong>Medical Distress Flag (Weight: 25%):</strong>
+                                <p style="margin-top:2px;">Confirmed injuries or critical medicine depletion triggers +10 priority points instantly.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'gov') {
+                window.location.href = '/login.html?role=gov';
+                return;
+            }
+            
+            components.renderNavbar("Decision Intelligence");
+            components.renderSidebar("/government/intelligence.html");
+            
+            // Render shared AI assistant panel pointing to Gov route
+            components.renderAIChatPanel('gov-ai-chat-container', '/api/gov/ai/ask');
+
+            // Render Right Side 40 Questions List
+            const sideList = document.getElementById('side-questions-list');
+            const questions = components.botQuestions;
+            
+            const categories = {};
+            questions.forEach(q => {
+                if (!categories[q.category]) categories[q.category] = [];
+                categories[q.category].push(q);
+            });
+
+            Object.keys(categories).forEach(cat => {
+                const header = document.createElement('div');
+                header.style.cssText = "font-weight: 700; font-size: 12px; color: var(--color-primary); margin-top: 8px; margin-bottom: 4px; display:flex; align-items:center; gap:6px;";
+                header.innerHTML = `<i class="fa-solid ${categories[cat][0].icon}" style="color:var(--color-info);"></i> ${cat} (${categories[cat].length})`;
+                sideList.appendChild(header);
+
+                categories[cat].forEach(item => {
+                    const btn = document.createElement('button');
+                    btn.className = 'ai-question-chip';
+                    btn.style.cssText = "width: 100%; justify-content: space-between; margin-bottom: 3px; font-size: 11px; padding: 6px 10px;";
+                    btn.innerHTML = `<span><strong>#${item.id}.</strong> ${item.q}</span> <i class="fa-solid fa-arrow-right" style="color:var(--color-primary-light);"></i>`;
+                    btn.onclick = () => {
+                        const input = document.getElementById('ai-chat-input');
+                        if (input) {
+                            input.value = item.q;
+                            const sendBtn = document.getElementById('btn-send-ai');
+                            if (sendBtn) sendBtn.click();
+                        }
+                    };
+                    sideList.appendChild(btn);
+                });
+            });
+
+            // Tab switching logic
+            const tabQuestions = document.getElementById('tab-btn-questions');
+            const tabRules = document.getElementById('tab-btn-rules');
+            const viewQuestions = document.getElementById('view-questions');
+            const viewRules = document.getElementById('view-rules');
+
+            tabQuestions.onclick = () => {
+                tabQuestions.className = 'btn btn-primary';
+                tabRules.className = 'btn btn-outline';
+                viewQuestions.style.display = 'flex';
+                viewRules.style.display = 'none';
+            };
+
+            tabRules.onclick = () => {
+                tabRules.className = 'btn btn-primary';
+                tabQuestions.className = 'btn btn-outline';
+                viewRules.style.display = 'flex';
+                viewQuestions.style.display = 'none';
+            };
+        });
+    </script>
+</body>
+</html>

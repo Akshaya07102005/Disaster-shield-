@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Food Resource Operations — NGO Portal</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header class="app-navbar"></header>
+    
+    <div class="portal-layout">
+        <aside class="sidebar"></aside>
+        
+        <main class="portal-content">
+            <div style="margin-bottom: 20px;">
+                <h2 style="font-size: 24px; font-weight: 800;">Food Operations & Distribution</h2>
+                <p style="color: var(--text-secondary); font-size: 13px;">Monitor surplus levels and dispatch dry rations/water boxes to deficit sectors.</p>
+            </div>
+
+            <!-- Summary Cards -->
+            <div class="shared-grid" style="margin-bottom: 24px;">
+                <div class="glass-panel" style="border-top: 4px solid var(--color-low);">
+                    <div style="font-size: 11px; color: var(--text-secondary); font-weight:700; text-transform:uppercase;">Total Rations Available</div>
+                    <div style="font-size: 28px; font-weight: 800; margin: 4px 0;" id="food-available">0 Packs</div>
+                </div>
+                <div class="glass-panel" style="border-top: 4px solid var(--color-high);">
+                    <div style="font-size: 11px; color: var(--text-secondary); font-weight:700; text-transform:uppercase;">Total Rations Required</div>
+                    <div style="font-size: 28px; font-weight: 800; margin: 4px 0;" id="food-required">0 Packs</div>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px;">
+                <!-- Left: Deficit Table -->
+                <div class="glass-panel" style="display: flex; flex-direction: column;">
+                    <h3 style="font-size: 15px; margin-bottom: 12px; font-weight: 700; border-bottom: 1.5px solid var(--border-color); padding-bottom: 8px;">
+                        <i class="fa-solid fa-scale-unbalanced" style="color: var(--color-primary-light);"></i> Regional Surplus & Deficit Indicators
+                    </h3>
+                    <div id="food-table-container">
+                        <div style="text-align: center; color: var(--text-muted); padding: 40px;">Loading distribution matrix...</div>
+                    </div>
+                </div>
+
+                <!-- Right: Dispatch Form -->
+                <div class="glass-panel" style="display: flex; flex-direction: column;">
+                    <h3 style="font-size: 15px; margin-bottom: 12px; font-weight: 700; border-bottom: 1.5px solid var(--border-color); padding-bottom: 8px;">
+                        <i class="fa-solid fa-truck-ramp-box" style="color: var(--color-success);"></i> Update Supply Stocks
+                    </h3>
+                    <form id="form-food" onsubmit="handleFoodUpdate(event)">
+                        <div class="form-group">
+                            <label class="form-label" for="food-area-select">Target Sector</label>
+                            <select class="form-control" id="food-area-select" required>
+                                <option value="">Select sector...</option>
+                            </select>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                            <div class="form-group">
+                                <label class="form-label" for="food-added">Quantity Added</label>
+                                <input class="form-control" type="number" id="food-added" min="0" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="food-distributed">Quantity Distributed</label>
+                                <input class="form-control" type="number" id="food-distributed" min="0" value="0">
+                            </div>
+                        </div>
+                        <button class="btn btn-success" type="submit" style="padding: 12px; font-weight:700;">
+                            <i class="fa-solid fa-circle-check"></i> Submit Supply Change
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'ngo') {
+                window.location.href = '/login.html?role=ngo';
+                return;
+            }
+            
+            components.renderNavbar("Food Operations");
+            components.renderSidebar("/ngo/food-analysis.html");
+            
+            await loadFoodAnalysis();
+            await populateAreas();
+        });
+
+        async function loadFoodAnalysis() {
+            try {
+                const data = await api.request('/api/ngo/analysis/food');
+                
+                document.getElementById('food-available').innerText = `${data.total_available_food_packets} Packs`;
+                document.getElementById('food-required').innerText = `${data.total_required_food_packets} Packs`;
+                
+                const cols = [
+                    { title: "Area Sector", field: "area_name", render: (val) => `<b>${val}</b>` },
+                    { title: "Available", field: "available" },
+                    { title: "Required", field: "required" },
+                    { title: "Deficit Margin", field: "deficit", render: (val) => {
+                        if (val > 0) {
+                            return `<span style="color:var(--color-critical); font-weight:800;">-${val} packs</span>`;
+                        }
+                        return `<span style="color:var(--color-low); font-weight:700;">Surplus</span>`;
+                    }}
+                ];
+                
+                components.renderDataTable('food-table-container', cols, data.breakdown);
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        async function populateAreas() {
+            try {
+                const list = await api.request('/api/public/areas');
+                const sel = document.getElementById('food-area-select');
+                sel.innerHTML = '<option value="">Select sector...</option>';
+                list.forEach(a => {
+                    const opt = document.createElement('option');
+                    opt.value = a.id;
+                    opt.innerText = a.area_name;
+                    sel.appendChild(opt);
+                });
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        async function handleFoodUpdate(e) {
+            e.preventDefault();
+            const areaId = document.getElementById('food-area-select').value;
+            const added = parseInt(document.getElementById('food-added').value);
+            const distributed = parseInt(document.getElementById('food-distributed').value);
+            
+            try {
+                await api.request('/api/ngo/analysis/food', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        area_id: parseInt(areaId),
+                        quantity_added: added,
+                        quantity_distributed: distributed
+                    })
+                });
+                
+                document.getElementById('food-added').value = '0';
+                document.getElementById('food-distributed').value = '0';
+                
+                alert("Food inventories updated successfully!");
+                await loadFoodAnalysis();
+            } catch(e) {
+                alert(`Update failed: ${e.message}`);
+            }
+        }
+    </script>
+</body>
+</html>

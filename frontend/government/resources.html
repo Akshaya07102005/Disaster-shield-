@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resource Management — Government Portal</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header class="app-navbar"></header>
+    
+    <div class="portal-layout">
+        <aside class="sidebar"></aside>
+        
+        <main class="portal-content">
+            <div style="margin-bottom: 20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                <div>
+                    <h2 style="font-size: 24px; font-weight: 800;">Resource Stock Inventories</h2>
+                    <p style="color: var(--text-secondary); font-size: 13px;">Manage emergency medical kits, motorboat fleets, and dry ration reserves by sector.</p>
+                </div>
+                <button class="btn btn-primary" onclick="openResourceModal()" style="width:auto; font-weight:700;">
+                    <i class="fa-solid fa-plus"></i> Allocate Resources
+                </button>
+            </div>
+
+            <!-- Table of resources -->
+            <div class="glass-panel" style="padding: 20px;">
+                <div id="resources-table-container">
+                    <div style="text-align: center; color: var(--text-muted); padding: 40px;">
+                        <i class="fa-solid fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 10px;"></i>
+                        <p>Loading resource logs...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Add/Edit Resource Modal -->
+    <div id="resource-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.4); z-index: 10000; align-items: center; justify-content: center; padding: 20px;">
+        <div class="glass-panel" style="width: 100%; max-width: 420px; padding: 24px;">
+            <h3 style="margin-bottom: 16px;"><i class="fa-solid fa-warehouse"></i> Inventory Stock Control</h3>
+            <form onsubmit="handleSaveResource(event)">
+                <div class="form-group">
+                    <label class="form-label">Target Sector Area</label>
+                    <select class="form-control" id="res-area-select" required></select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Resource Type</label>
+                    <select class="form-control" id="res-type-select" required>
+                        <option value="food">Food Packs & Water</option>
+                        <option value="medical">Medical kits</option>
+                        <option value="boats">Rescue Boats</option>
+                        <option value="vehicles">Response Vehicles</option>
+                    </select>
+                </div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                    <div class="form-group">
+                        <label class="form-label">Quantity Available</label>
+                        <input class="form-control" type="number" id="res-avail" min="0" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Quantity Required</label>
+                        <input class="form-control" type="number" id="res-req" min="0" value="0">
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button class="btn btn-primary" type="submit">Save Stock</button>
+                    <button class="btn btn-secondary" type="button" onclick="closeResourceModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'gov') {
+                window.location.href = '/login.html?role=gov';
+                return;
+            }
+            
+            components.renderNavbar("Resource Inventories");
+            components.renderSidebar("/government/resources.html");
+            
+            await loadAreasOptions();
+            await loadResourcesList();
+        });
+
+        async function loadAreasOptions() {
+            try {
+                const list = await api.request('/api/public/areas');
+                const sel = document.getElementById('res-area-select');
+                sel.innerHTML = '<option value="">Select sector...</option>';
+                list.forEach(a => {
+                    const opt = document.createElement('option');
+                    opt.value = a.id;
+                    opt.innerText = a.area_name;
+                    sel.appendChild(opt);
+                });
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        async function loadResourcesList() {
+            try {
+                const list = await api.request('/api/gov/resources');
+                
+                const cols = [
+                    { title: "ID", field: "id", render: (val) => `<b>#${val}</b>` },
+                    { title: "Sector Region", field: "area_name", render: (val) => `<b>${val}</b>` },
+                    { title: "Resource Type", field: "resource_type", render: (val) => `<span style="text-transform:uppercase; font-weight:700;">${val}</span>` },
+                    { title: "Available", field: "quantity_available" },
+                    { title: "Required Buffer", field: "quantity_required" },
+                    { title: "Actions", field: "id", render: (val, row) => {
+                        return `
+                            <button class="btn btn-secondary" onclick="editResource(${row.area_id}, '${row.resource_type}', ${row.quantity_available}, ${row.quantity_required})" style="padding: 4px 8px; font-size:11px; width:auto; border-radius:4px;"><i class="fa-solid fa-pen"></i> Edit</button>
+                            <button class="btn btn-danger" onclick="deleteResource(${val})" style="padding: 4px 8px; font-size:11px; width:auto; border-radius:4px;"><i class="fa-solid fa-trash"></i> Delete</button>
+                        `;
+                    }}
+                ];
+                
+                components.renderDataTable('resources-table-container', cols, list);
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        function openResourceModal() {
+            document.getElementById('resource-modal').style.display = 'flex';
+        }
+
+        function closeResourceModal() {
+            document.getElementById('resource-modal').style.display = 'none';
+        }
+
+        function editResource(areaId, type, avail, req) {
+            document.getElementById('res-area-select').value = areaId;
+            document.getElementById('res-type-select').value = type;
+            document.getElementById('res-avail').value = avail;
+            document.getElementById('res-req').value = req;
+            openResourceModal();
+        }
+
+        async function handleSaveResource(e) {
+            e.preventDefault();
+            const areaId = document.getElementById('res-area-select').value;
+            const type = document.getElementById('res-type-select').value;
+            const avail = parseInt(document.getElementById('res-avail').value);
+            const req = parseInt(document.getElementById('res-req').value);
+            
+            try {
+                await api.request('/api/gov/resources', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        area_id: parseInt(areaId),
+                        resource_type: type,
+                        quantity_available: avail,
+                        quantity_required: req
+                    })
+                });
+                closeResourceModal();
+                alert("Resource inventories updated successfully!");
+                await loadResourcesList();
+            } catch(e) {
+                alert(`Update failed: ${e.message}`);
+            }
+        }
+
+        async function deleteResource(id) {
+            if (!confirm("Are you sure you want to delete this resource inventory entry?")) return;
+            
+            try {
+                await api.request(`/api/gov/resources/${id}`, { method: 'DELETE' });
+                alert("Resource record successfully removed.");
+                await loadResourcesList();
+            } catch(e) {
+                alert(`Failed to delete resource: ${e.message}`);
+            }
+        }
+    </script>
+</body>
+</html>

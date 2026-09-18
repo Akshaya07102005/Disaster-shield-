@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disaster Shield AI — Chennai Operations Portal</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body style="background-color: var(--bg-main); color: var(--text-primary); font-family: 'Inter', sans-serif;">
+
+    <!-- Government Style Top Header Bar (Sticky) -->
+    <header class="app-navbar" style="position: sticky; top: 0; z-index: 1000; box-shadow: var(--shadow-md);">
+        <div class="navbar-brand">
+            <i class="fa-solid fa-shield-halved" style="color: var(--color-critical); margin-right: 8px;"></i>
+            <span style="font-weight: 800; letter-spacing: 0.03em;" data-trn="nav_brand">DISASTER SHIELD AI — CHENNAI</span>
+        </div>
+        
+        <!-- Center Nav Links -->
+        <nav style="display: flex; gap: 20px; align-items: center;" class="home-nav-links">
+            <a href="#hero" style="color: white; text-decoration: none; font-size: 13px; font-weight: 500;" data-trn="nav_home">Home</a>
+            <a href="#about" style="color: var(--text-secondary); text-decoration: none; font-size: 13px; font-weight: 500;" data-trn="nav_about">About</a>
+            <a href="#services" style="color: var(--text-secondary); text-decoration: none; font-size: 13px; font-weight: 500;" data-trn="nav_services">Services</a>
+            <a href="#alerts" style="color: var(--text-secondary); text-decoration: none; font-size: 13px; font-weight: 500;" data-trn="nav_alerts">Public Alerts</a>
+            <a href="#helplines" style="color: var(--text-secondary); text-decoration: none; font-size: 13px; font-weight: 500;" data-trn="nav_helplines">Helplines</a>
+        </nav>
+
+        <div style="display: flex; gap: 12px; align-items: center;">
+            <!-- Language Selector toggle -->
+            <button class="btn btn-secondary" onclick="toggleLanguage()" id="btn-lang-toggle" style="padding: 6px 12px; width: auto; font-size: 12px; font-weight:700; border-radius:4px;">
+                தமிழ்
+            </button>
+            <a href="/login.html" class="btn btn-primary" style="padding: 8px 16px; font-size: 12px; text-decoration: none; width: auto; font-weight: 700; border-radius: 4px;" data-trn="nav_login">
+                Login / Register
+            </a>
+        </div>
+    </header>
+
+    <!-- Public Live Alerts Banner Broadcast (Match FEMA/NDMA ticker) -->
+    <div style="background-color: var(--color-critical); color: white; padding: 10px 20px; font-size: 13px; font-weight: 600; display: none;" id="public-ticker-banner">
+        <div class="citizen-container" style="display: flex; align-items: center; gap: 10px;">
+            <i class="fa-solid fa-triangle-exclamation" style="animation: pulse 1.5s infinite;"></i>
+            <marquee scrollamount="5" id="alerts-marquee-text" style="flex: 1;"></marquee>
+        </div>
+    </div>
+
+    <!-- Hero Section -->
+    <section id="hero" style="position: relative; padding: 80px 20px; background: radial-gradient(circle at 10% 20%, #1E293B 0%, #0F172A 90%); min-height: 480px; display: flex; align-items: center; justify-content: center; overflow: hidden; border-bottom: 2px solid var(--border-color);">
+        <!-- Background Grid overlay -->
+        <div style="position: absolute; top:0; left:0; width:100%; height:100%; opacity: 0.05; background-image: radial-gradient(var(--color-primary-light) 1px, transparent 0); background-size: 24px 24px;"></div>
+        
+        <div style="max-width: 900px; text-align: center; z-index: 10;">
+            <span class="user-badge" style="background: rgba(220, 38, 38, 0.1); color: var(--color-critical); border-color: rgba(220,38,38,0.25); margin-bottom: 15px; font-weight: 700;" data-trn="hero_badge">OFFICIAL EMERGENCY OPERATIONS PORTAL</span>
+            
+            <h1 style="font-size: 36px; font-weight: 800; line-height: 1.2; margin-bottom: 15px; color: white;" data-trn="hero_title">
+                Coordinated disaster response for Chennai — Government, Citizens, and NGOs on one platform
+            </h1>
+            
+            <!-- Live status strip (Dynamic counts fetched from real DB) -->
+            <div class="citizen-container" style="max-width: 900px; margin: 0 auto 30px auto;">
+                <div class="status-grid" style="margin: 0 auto;">
+                    <div class="glass-panel" style="background: rgba(255, 255, 255, 0.05); border: 1.5px solid rgba(255, 255, 255, 0.15); padding: 12px; border-radius: var(--radius-sm); text-align: center; color: white;">
+                        <h3 style="color: white; font-size: 20px; font-weight: 800; margin-bottom: 2px;" id="hero-sectors-count">426</h3>
+                        <span style="font-size: 11px; color: rgba(255, 255, 255, 0.6);" data-trn="status_sectors">Sectors Mapped</span>
+                    </div>
+                    <div class="glass-panel" style="background: rgba(255, 255, 255, 0.05); border: 1.5px solid rgba(255, 255, 255, 0.15); padding: 12px; border-radius: var(--radius-sm); text-align: center; color: white;">
+                        <h3 style="color: var(--color-critical); font-size: 20px; font-weight: 800; margin-bottom: 2px;" id="hero-critical-count">0</h3>
+                        <span style="font-size: 11px; color: rgba(255, 255, 255, 0.6);" data-trn="status_critical">Critical Areas</span>
+                    </div>
+                    <div class="glass-panel" style="background: rgba(255, 255, 255, 0.05); border: 1.5px solid rgba(255, 255, 255, 0.15); padding: 12px; border-radius: var(--radius-sm); text-align: center; color: white;">
+                        <h3 style="color: var(--color-medium); font-size: 20px; font-weight: 800; margin-bottom: 2px;" id="hero-active-sos-count">0</h3>
+                        <span style="font-size: 11px; color: rgba(255, 255, 255, 0.6);" data-trn="status_active_sos">Active SOS Requests</span>
+                    </div>
+                    <div class="glass-panel" style="background: rgba(255, 255, 255, 0.05); border: 1.5px solid rgba(255, 255, 255, 0.15); padding: 12px; border-radius: var(--radius-sm); text-align: center; color: white;">
+                        <h3 style="color: var(--color-low); font-size: 20px; font-weight: 800; margin-bottom: 2px;" id="hero-resolved-count">120</h3>
+                        <span style="font-size: 11px; color: rgba(255, 255, 255, 0.6);" data-trn="status_resolved">Resolved SOS</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Two Primary CTAs -->
+            <div style="display: flex; gap: 15px; justify-content: center; align-items: center; flex-wrap: wrap;">
+                <a href="/login.html?role=citizen" class="btn btn-primary" style="background: var(--color-critical); border-color: var(--color-critical); padding: 14px 28px; font-size: 14px; text-decoration: none; width: auto; font-weight: 800; border-radius: var(--radius-sm); display: flex; align-items: center; gap: 8px;" data-trn="cta_citizen">
+                    <i class="fa-solid fa-circle-radiation"></i> Report Emergency (Citizen Login)
+                </a>
+                <a href="/login.html" class="btn btn-secondary" style="padding: 14px 28px; font-size: 14px; text-decoration: none; width: auto; font-weight: 700; border-radius: var(--radius-sm); display: flex; align-items: center; gap: 8px;" data-trn="cta_gov_ngo">
+                    <i class="fa-solid fa-users-gear"></i> Government / NGO Portal
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" style="padding: 60px 0;" class="citizen-container">
+        <div style="text-align: center; max-width: 700px; margin: 0 auto 40px auto; padding: 0 20px;">
+            <h2 style="font-size: 26px; font-weight: 800; margin-bottom: 10px;" data-trn="about_title">Platform Objective & Mapped Area Scope</h2>
+            <p style="color: var(--text-secondary); font-size: 14px;" data-trn="about_subtitle">
+                An integrated AI-assisted command framework mapping **426 sectors across Chennai** to automate critical warnings, coordinate dispatches, and track approaching rescue squads in real time.
+            </p>
+        </div>
+
+        <!-- Workflow visual flow -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 20px; text-align: center; margin-bottom: 50px; padding: 0 20px;">
+            <div class="glass-panel" style="padding: 16px; border-top: 3px solid var(--color-info);">
+                <div style="width: 36px; height: 36px; border-radius: 50%; background: rgba(59,130,246,0.1); display:flex; align-items:center; justify-content:center; margin: 0 auto 10px auto; color: var(--color-info); font-weight: 800;">1</div>
+                <strong style="font-size: 13px;" data-trn="flow_1_title">Risk Assessment</strong>
+                <p style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;" data-trn="flow_1_desc">Sectors are classified dynamically by real-time telemetry.</p>
+            </div>
+            <div class="glass-panel" style="padding: 16px; border-top: 3px solid var(--color-medium);">
+                <div style="width: 36px; height: 36px; border-radius: 50%; background: rgba(245,158,11,0.1); display:flex; align-items:center; justify-content:center; margin: 0 auto 10px auto; color: var(--color-medium); font-weight: 800;">2</div>
+                <strong style="font-size: 13px;" data-trn="flow_2_title">Regional Warning</strong>
+                <p style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;" data-trn="flow_2_desc">Broadcast alerts notify citizens based on local risks.</p>
+            </div>
+            <div class="glass-panel" style="padding: 16px; border-top: 3px solid var(--color-critical);">
+                <div style="width: 36px; height: 36px; border-radius: 50%; background: rgba(220,38,38,0.1); display:flex; align-items:center; justify-content:center; margin: 0 auto 10px auto; color: var(--color-critical); font-weight: 800;">3</div>
+                <strong style="font-size: 13px;" data-trn="flow_3_title">Panic SOS Trigger</strong>
+                <p style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;" data-trn="flow_3_desc">Trapped citizens trigger SOS with live coordinates.</p>
+            </div>
+            <div class="glass-panel" style="padding: 16px; border-top: 3px solid var(--color-primary-light);">
+                <div style="width: 36px; height: 36px; border-radius: 50%; background: rgba(12,100,200,0.1); display:flex; align-items:center; justify-content:center; margin: 0 auto 10px auto; color: var(--color-primary-light); font-weight: 800;">4</div>
+                <strong style="font-size: 13px;" data-trn="flow_4_title">Central Command</strong>
+                <p style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;" data-trn="flow_4_desc">Dispatcher reviews prioritizing metrics and selects NGO.</p>
+            </div>
+            <div class="glass-panel" style="padding: 16px; border-top: 3px solid var(--color-low);">
+                <div style="width: 36px; height: 36px; border-radius: 50%; background: rgba(31,138,112,0.1); display:flex; align-items:center; justify-content:center; margin: 0 auto 10px auto; color: var(--color-low); font-weight: 800;">5</div>
+                <strong style="font-size: 13px;" data-trn="flow_5_title">NGO GPS Route</strong>
+                <p style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;" data-trn="flow_5_desc">Live approaching route trail overlays dynamically.</p>
+            </div>
+        </div>
+
+        <!-- Three pillars Cards -->
+        <div style="padding: 0 20px;" class="shared-grid">
+            <div class="glass-panel" style="padding: 24px; border-left: 4px solid var(--color-primary-light);">
+                <h3 style="font-size:16px; margin-bottom: 8px;"><i class="fa-solid fa-building-shield"></i> Government Command</h3>
+                <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.45;" data-trn="pillar_gov">
+                    Centralized dispatcher dashboard monitoring active alert queues, dynamic risk engine evaluations, live audit trail timelines, and AI-optimized transfer reallocation calculations.
+                </p>
+            </div>
+            <div class="glass-panel" style="padding: 24px; border-left: 4px solid var(--color-critical);">
+                <h3 style="font-size:16px; margin-bottom: 8px;"><i class="fa-solid fa-users"></i> Citizens App</h3>
+                <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.45;" data-trn="pillar_citizen">
+                    One-tap panic SOS broadcast transmitter supporting local offline storage queue syncer, bilingual language toggling, safety center locators, and family safety safety grids.
+                </p>
+            </div>
+            <div class="glass-panel" style="padding: 24px; border-left: 4px solid var(--color-low);">
+                <h3 style="font-size:16px; margin-bottom: 8px;"><i class="fa-solid fa-truck-monster"></i> NGOs Dispatch Network</h3>
+                <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.45;" data-trn="pillar_ngo">
+                    Live coordination panel supporting accepting rescue missions, checking concurrent workload capacities, live GPS path simulation routing, and direct dispatcher chats.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Services Section -->
+    <section id="services" style="background: #F8FAFC; padding: 60px 0; border-top: 1.5px solid var(--border-color); border-bottom: 1.5px solid var(--border-color);">
+        <div class="citizen-container">
+            <div style="text-align: center; max-width: 600px; margin: 0 auto 35px auto; padding: 0 20px;">
+                <h2 style="font-size: 26px; font-weight: 800; margin-bottom: 10px;" data-trn="services_title">Emergency Services Mapped Features</h2>
+                <p style="color: var(--text-secondary); font-size: 13px;" data-trn="services_subtitle">Platform capabilities designed to accelerate rescue and keep the community coordinated.</p>
+            </div>
+
+            <div style="padding: 0 20px;" class="services-grid">
+                <div class="glass-panel" style="background: white; padding: 24px; display: flex; flex-direction: column; justify-content: space-between;">
+                    <div>
+                        <i class="fa-solid fa-map" style="font-size: 24px; color: var(--color-primary-light); margin-bottom:10px;"></i>
+                        <h4 style="font-size: 14px; margin-bottom: 6px;" data-trn="s1_title">Real-Time Risk Monitoring</h4>
+                        <p style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;" data-trn="s1_desc">Monitor Chennai's hydrometeorological threat levels sector-by-sector. The engine processes weather warnings and terrain elevation dynamically to update safety indicators.</p>
+                    </div>
+                    <a href="#about" style="font-size: 11px; color: var(--color-primary-light); font-weight: 700; text-decoration: none; margin-top: 12px; display: block;">Learn more <i class="fa-solid fa-arrow-right"></i></a>
+                </div>
+                <div class="glass-panel" style="background: white; padding: 24px; display: flex; flex-direction: column; justify-content: space-between;">
+                    <div>
+                        <i class="fa-solid fa-phone-flip" style="font-size: 24px; color: var(--color-critical); margin-bottom:10px;"></i>
+                        <h4 style="font-size: 14px; margin-bottom: 6px;" data-trn="s2_title">Emergency SOS Reporting</h4>
+                        <p style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;" data-trn="s2_desc">Transmit emergency help signals directly to the dispatch command center. Caches critical details locally to allow offline transmission once connectivity returns.</p>
+                    </div>
+                    <a href="#about" style="font-size: 11px; color: var(--color-primary-light); font-weight: 700; text-decoration: none; margin-top: 12px; display: block;">Learn more <i class="fa-solid fa-arrow-right"></i></a>
+                </div>
+                <div class="glass-panel" style="background: white; padding: 24px; display: flex; flex-direction: column; justify-content: space-between;">
+                    <div>
+                        <i class="fa-solid fa-truck-pickup" style="font-size: 24px; color: var(--color-low); margin-bottom:10px;"></i>
+                        <h4 style="font-size: 14px; margin-bottom: 6px;" data-trn="s3_title">NGO Coordinated Rescue</h4>
+                        <p style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;" data-trn="s3_desc">Coordinate dispatches, track squad assignments, and monitor rescue mission route coordinates. Allows NGOs to update active workload capacities.</p>
+                    </div>
+                    <a href="#about" style="font-size: 11px; color: var(--color-primary-light); font-weight: 700; text-decoration: none; margin-top: 12px; display: block;">Learn more <i class="fa-solid fa-arrow-right"></i></a>
+                </div>
+                <div class="glass-panel" style="background: white; padding: 24px; display: flex; flex-direction: column; justify-content: space-between;">
+                    <div>
+                        <i class="fa-solid fa-house-shield" style="font-size: 24px; color: var(--color-primary-light); margin-bottom:10px;"></i>
+                        <h4 style="font-size: 14px; margin-bottom: 6px;" data-trn="s4_title">Shelter & Hospital Locator</h4>
+                        <p style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;" data-trn="s4_desc">Locate nearest designated flood relief centers and emergency medical wards. Sorts availability dynamically based on proximity and bed counts.</p>
+                    </div>
+                    <a href="#about" style="font-size: 11px; color: var(--color-primary-light); font-weight: 700; text-decoration: none; margin-top: 12px; display: block;">Learn more <i class="fa-solid fa-arrow-right"></i></a>
+                </div>
+                <div class="glass-panel" style="background: white; padding: 24px; display: flex; flex-direction: column; justify-content: space-between;">
+                    <div>
+                        <i class="fa-solid fa-building-shield" style="font-size: 24px; color: var(--color-medium); margin-bottom:10px;"></i>
+                        <h4 style="font-size: 14px; margin-bottom: 6px;" data-trn="s5_title">Government Command</h4>
+                        <p style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;" data-trn="s5_desc">Access centralized operations rooms, review dynamic priority dispatch queues, audit logs, and trigger supply optimization.</p>
+                    </div>
+                    <a href="#about" style="font-size: 11px; color: var(--color-primary-light); font-weight: 700; text-decoration: none; margin-top: 12px; display: block;">Learn more <i class="fa-solid fa-arrow-right"></i></a>
+                </div>
+                <div class="glass-panel" style="background: white; padding: 24px; display: flex; flex-direction: column; justify-content: space-between;">
+                    <div>
+                        <i class="fa-solid fa-robot" style="font-size: 24px; color: var(--color-success); margin-bottom:10px;"></i>
+                        <h4 style="font-size: 14px; margin-bottom: 6px;" data-trn="s6_title">AI Disaster Assistant</h4>
+                        <p style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;" data-trn="s6_desc">Interact with the decision support agent for instant emergency protocol queries, risk analytics, and climatic conditions reports.</p>
+                    </div>
+                    <a href="#about" style="font-size: 11px; color: var(--color-primary-light); font-weight: 700; text-decoration: none; margin-top: 12px; display: block;">Learn more <i class="fa-solid fa-arrow-right"></i></a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Public Alerts feed & Helpline grid -->
+    <section id="alerts" style="padding: 60px 0;" class="citizen-container">
+        <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 30px;">
+            
+            <!-- Left: Read-only Alerts Ticker -->
+            <div>
+                <h3 style="font-size: 18px; margin-bottom: 15px; display:flex; align-items:center; gap:8px;">
+                    <i class="fa-solid fa-bullhorn" style="color:var(--color-critical);"></i>
+                    <span data-trn="public_alerts_header">Public Advisories & Active Alerts</span>
+                </h3>
+                <div id="public-alerts-feed" style="display:flex; flex-direction:column; gap:12px;">
+                    <div style="text-align:center; padding:30px; color:var(--text-secondary); font-size:12px;">
+                        No active advisories broadcasted at this moment.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Helpline Numbers & Downloads -->
+            <div style="display:flex; flex-direction:column; gap:20px;">
+                <!-- HELPLINES BLOCK -->
+                <div class="glass-panel" id="helplines" style="border-top: 4px solid var(--color-critical); padding: 20px;">
+                    <h3 style="font-size: 15px; margin-bottom: 12px; color: var(--color-primary); font-weight:700;" data-trn="helpline_title">
+                        <i class="fa-solid fa-phone-volume"></i> Emergency Helplines
+                    </h3>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; font-size:12px;">
+                        <div style="padding:8px; border:1px solid var(--border-color); border-radius:4px; text-align:center;">
+                            <strong>Disaster Mgmt</strong><br/><span style="color:var(--color-critical); font-weight:800; font-size:14px;">1077</span>
+                        </div>
+                        <div style="padding:8px; border:1px solid var(--border-color); border-radius:4px; text-align:center;">
+                            <strong>Fire Force</strong><br/><span style="color:var(--color-critical); font-weight:800; font-size:14px;">101</span>
+                        </div>
+                        <div style="padding:8px; border:1px solid var(--border-color); border-radius:4px; text-align:center;">
+                            <strong>Ambulance</strong><br/><span style="color:var(--color-critical); font-weight:800; font-size:14px;">108</span>
+                        </div>
+                        <div style="padding:8px; border:1px solid var(--border-color); border-radius:4px; text-align:center;">
+                            <strong>Police Command</strong><br/><span style="color:var(--color-critical); font-weight:800; font-size:14px;">100</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PREPAREDNESS RESOURCES -->
+                <div class="glass-panel" style="padding: 20px;">
+                    <h3 style="font-size: 15px; margin-bottom: 12px;" data-trn="prep_title"><i class="fa-solid fa-download"></i> Safety Handbooks</h3>
+                    <div style="font-size: 11px; color:var(--text-secondary); margin-bottom:10px;">Download official preparedness checklist brochures.</div>
+                    <div style="display:flex; flex-direction:column; gap:8px; font-size:12px;">
+                        <a href="#" onclick="downloadMockPdf('flood_safety')" class="user-badge" style="text-decoration:none; padding:8px; text-align:left; display:block; cursor:pointer;">
+                            <i class="fa-solid fa-file-pdf" style="color:var(--color-critical);"></i> Chennai Flood Safety Handbook
+                        </a>
+                        <a href="#" onclick="downloadMockPdf('cyclone_safety')" class="user-badge" style="text-decoration:none; padding:8px; text-align:left; display:block; cursor:pointer;">
+                            <i class="fa-solid fa-file-pdf" style="color:var(--color-critical);"></i> Cyclone Preparedness Checklist
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- Notices & Inter-Department Coordination -->
+    <section style="background:#F1F5F9; padding: 40px 20px; border-top:1.5px solid var(--border-color);">
+        <div class="citizen-container">
+            <h3 style="font-size: 15px; margin-bottom: 15px; text-align:center; color: var(--color-primary); font-weight:700;" data-trn="notice_header">Coordinated Departments & Notices</h3>
+            <div style="display:flex; justify-content:center; gap:20px; flex-wrap:wrap; opacity:0.75; font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase;">
+                <span>Fire & Rescue Dept</span>
+                <span>•</span>
+                <span>Municipal Corporation</span>
+                <span>•</span>
+                <span>Health Dept</span>
+                <span>•</span>
+                <span>Chennai Police Command</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer style="background-color: var(--color-primary); color: white; padding: 40px 20px; font-size: 12px; border-top:3px solid var(--color-primary-light);">
+        <div class="citizen-container" style="display:grid; grid-template-columns: 1.5fr 1fr; gap:30px;">
+            <div>
+                <strong style="font-size: 13px; display:block; margin-bottom: 6px;" data-trn="footer_disclaimer_title">Official Disclaimer Notice</strong>
+                <p style="color: rgba(255,255,255,0.7); line-height: 1.45;" data-trn="footer_disclaimer_text">
+                    This platform is an official government-linked coordinates coordinator. In case of life-threatening emergencies, do not wait for dashboard dispatches — immediately dial 101, 108 or 1077 on landlines. All SOS transmissions are logged for audit compliance.
+                </p>
+                <div style="margin-top:15px; color:rgba(255,255,255,0.5);">
+                    <span data-trn="footer_last_updated">Data fresh rate: Live Sync</span> | <span>RTI Grievance Policy</span>
+                </div>
+            </div>
+            <div style="text-align: right;">
+                <strong style="display:block; margin-bottom: 8px;">DISASTER SHIELD AI</strong>
+                <a href="#hero" style="color:rgba(255,255,255,0.8); text-decoration:none; margin-left:10px;">Home</a>
+                <a href="#about" style="color:rgba(255,255,255,0.8); text-decoration:none; margin-left:10px;">About</a>
+                <a href="/login.html" style="color:rgba(255,255,255,0.8); text-decoration:none; margin-left:10px;">Login</a>
+                <div style="margin-top:20px; color:rgba(255,255,255,0.4);">
+                    &copy; 2026 Chennai Disaster Operations. All rights reserved.
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="/js/api.js"></script>
+    <script>
+        let currentLanguage = 'en';
+
+        const translations = {
+            'en': {
+                'nav_brand': 'DISASTER SHIELD AI — CHENNAI',
+                'nav_home': 'Home',
+                'nav_about': 'About',
+                'nav_services': 'Services',
+                'nav_alerts': 'Public Alerts',
+                'nav_helplines': 'Helplines',
+                'nav_login': 'Login / Register',
+                'hero_badge': 'OFFICIAL EMERGENCY OPERATIONS PORTAL',
+                'hero_title': 'Coordinated disaster response for Chennai — Government, Citizens, and NGOs on one platform',
+                'cta_citizen': 'Report Emergency (Citizen Login)',
+                'cta_gov_ngo': 'Government / NGO Portal',
+                'about_title': 'Platform Objective & Mapped Area Scope',
+                'about_subtitle': 'An integrated AI-assisted command framework mapping 426 sectors across Chennai to automate critical warnings, coordinate dispatches, and track approaching rescue squads in real time.',
+                'flow_1_title': 'Risk Assessment',
+                'flow_1_desc': 'Sectors are classified dynamically by real-time telemetry.',
+                'flow_2_title': 'Regional Warning',
+                'flow_2_desc': 'Broadcast alerts notify citizens based on local risks.',
+                'flow_3_title': 'Panic SOS Trigger',
+                'flow_3_desc': 'Trapped citizens trigger SOS with live coordinates.',
+                'flow_4_title': 'Central Command',
+                'flow_4_desc': 'Dispatcher reviews prioritizing metrics and selects NGO.',
+                'flow_5_title': 'NGO GPS Route',
+                'flow_5_desc': 'Live approaching route trail overlays dynamically.',
+                'services_title': 'Emergency Services Mapped Features',
+                'services_subtitle': 'Platform capabilities designed to accelerate rescue and keep the community coordinated.',
+                's1_title': 'Real-Time Risk Monitoring',
+                's1_desc': 'Dynamic area classification (Low, Medium, High, Critical) using real-time coordinates telemetry.',
+                's2_title': 'Emergency SOS Reporting',
+                's2_desc': 'One-tap citizen emergency panic button transmits coordinates and medical metadata immediately.',
+                's3_title': 'NGO-Coordinated Rescue',
+                's3_desc': 'Live status updates, concurrent workload metering, and approaching polyline route tracking.',
+                's4_title': 'Shelter & Hospital Locator',
+                's4_desc': 'Find closest emergency safe havens and ICU availability sorted dynamically by GPS distance.',
+                's5_title': 'Government Command',
+                's5_desc': 'Centralized monitoring queue dashboard displaying prioritizations and resource reallocations.',
+                's6_title': 'AI Disaster Assistant',
+                's6_desc': 'AI decision support, querying sector risk, and matching pre-trained rescue guidelines.',
+                'public_alerts_header': 'Public Advisories & Active Alerts',
+                'helpline_title': 'Emergency Helplines',
+                'prep_title': 'Safety Handbooks',
+                'notice_header': 'Coordinated Departments & Notices',
+                'footer_disclaimer_title': 'Official Disclaimer Notice',
+                'footer_disclaimer_text': 'This platform is an official government-linked coordinates coordinator. In case of life-threatening emergencies, do not wait for dashboard dispatches — immediately dial 101, 108 or 1077 on landlines. All SOS transmissions are logged for audit compliance.',
+                'footer_last_updated': 'Data fresh rate: Live Sync'
+            },
+            'ta': {
+                'nav_brand': 'பேரிடர் பாதுகாப்பு AI — சென்னை',
+                'nav_home': 'முகப்பு',
+                'nav_about': 'பற்றி',
+                'nav_services': 'சேவைகள்',
+                'nav_alerts': 'பொது அறிவிப்புகள்',
+                'nav_helplines': 'உதவி எண்கள்',
+                'nav_login': 'உள்நுழைவு / பதிவு',
+                'hero_badge': 'அதிகாரப்பூர்வ அவசர கால செயல்பாட்டு போர்டல்',
+                'hero_title': 'சென்னைக்கான ஒருங்கிணைந்த பேரிடர் மீட்பு — அரசு, குடிமக்கள் மற்றும் தன்னார்வ தொண்டு நிறுவனங்கள் ஒரே மேடையில்',
+                'cta_citizen': 'அவசரநிலையைப் புகாரளிக்கவும் (குடிமகன் உள்நுழைவு)',
+                'cta_gov_ngo': 'அரசு / தன்னார்வ தொண்டு நிறுவன போர்டல்',
+                'about_title': 'மேடையின் நோக்கம் மற்றும் இருப்பிட பரப்பளவு',
+                'about_subtitle': 'அவசர எச்சரிக்கைகளை தானியங்குபடுத்தவும், பணிகளை ஒருங்கிணைக்கவும், நேரலையில் மீட்புக் குழுக்களைக் கண்காணிக்கவும் சென்னை முழுவதும் 426 பகுதிகளை வரைபடமாக்கும் ஒருங்கிணைந்த போர்டல்.',
+                'flow_1_title': 'இடர் மதிப்பீடு',
+                'flow_1_desc': 'பகுதிகள் நேரடித் தரவுகளின் மூலம் இடர் நிலைகளாகப் பிரிக்கப்படுகின்றன.',
+                'flow_2_title': 'மண்டல எச்சரிக்கை',
+                'flow_2_desc': 'மண்டல இடர் நிலைகளின்படி குடிமக்களுக்கு அறிவிப்புகள் அனுப்பப்படும்.',
+                'flow_3_title': 'அவசர SOS பீதி',
+                'flow_3_desc': 'பாதிக்கப்பட்ட மக்கள் தங்களது இருப்பிடத்திலிருந்து அவசர SOS அனுப்புவர்.',
+                'flow_4_title': 'மத்திய கட்டுப்பாட்டு அறை',
+                'flow_4_desc': 'கட்டுப்பாட்டு அறை அதிகாரி முன்னுரிமைப் பட்டியலை ஆய்வு செய்து தொண்டு நிறுவனத்தைத் தேர்ந்தெடுப்பார்.',
+                'flow_5_title': 'தொண்டு நிறுவன பாதை',
+                'flow_5_desc': 'அணுகும் பாதையின் நேரடி ஜிபிஎஸ் வரைபடம் திரையில் தெரியும்.',
+                'services_title': 'அவசர சேவைகள் அம்சங்கள்',
+                'services_subtitle': 'மீட்பை விரைவுபடுத்தவும் சமூகத்தை ஒருங்கிணைக்கவும் வடிவமைக்கப்பட்ட மேடை திறன்கள்.',
+                's1_title': 'நேரடி இடர் கண்காணிப்பு',
+                's1_desc': 'நேரடி ஜிபிஎஸ் தரவைப் பயன்படுத்தி மண்டலங்களை இடர் நிலைகளாக (குறைந்த, நடுத்தர, அதிக, ஆபத்தான) பிரித்தல்.',
+                's2_title': 'அவசர SOS புகாரளிப்பு',
+                's2_desc': 'ஒரே தட்டலில் குடிமகன் அவசர SOS பொத்தான் இருப்பிடம் மற்றும் மருத்துவ தேவைகளை அனுப்புகிறது.',
+                's3_title': 'ஒருங்கிணைந்த மீட்பு',
+                's3_desc': 'நேரடி நிலை புதுப்பிப்புகள், பணி வரம்பு கண்காணிப்பு மற்றும் மீட்புப் பாதை கண்காணிப்பு.',
+                's4_title': 'முகாம் & மருத்துவமனை கண்டறிதல்',
+                's4_desc': 'தற்போதைய இருப்பிடத்திலிருந்து அருகிலுள்ள தங்குமிடங்கள் மற்றும் படுக்கை வசதிகளைக் கண்டறிதல்.',
+                's5_title': 'அரசு கட்டுப்பாட்டு அறை',
+                's5_desc': 'மீட்பு முன்னுரிமைப் பட்டியல்கள் மற்றும் வளங்களை re-allocate செய்யும் கண்காணிப்பு அறை.',
+                's6_title': 'AI பேரிடர் உதவியாளர்',
+                's6_desc': 'மண்டல இடர் விவரங்களை அறியவும், அவசர மீட்பு வழிகாட்டுதல்களைப் பெறவும் உதவும் AI.',
+                'public_alerts_header': 'பொது ஆலோசனைகள் மற்றும் செயலில் உள்ள எச்சரிக்கைகள்',
+                'helpline_title': 'அவசரகால உதவி எண்கள்',
+                'prep_title': 'பாதுகாப்பு கையேடுகள்',
+                'notice_header': 'ஒருங்கிணைந்த துறைகள் & அறிவிப்புகள்',
+                'footer_disclaimer_title': 'அதிகாரப்பூர்வ மறுப்பு அறிவிப்பு',
+                'footer_disclaimer_text': 'இந்த மேடை அதிகாரப்பூர்வ அரசு சார்ந்த மீட்பு ஒருங்கிணைப்பு போர்டல் ஆகும். உயிருக்கு ஆபத்தான அவசரநிலைகளில், இந்த போர்டல் மூலம் மீட்புக்கு காத்திருக்க வேண்டாம் - உடனடியாக தொலைபேசியில் 101, 108 அல்லது 1077 எண்களைத் தொடர்பு கொள்ளவும்.',
+                'footer_last_updated': 'தரவு புதுப்பிப்பு நிலை: நேரடி ஒத்திசைவு'
+            }
+        };
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = api.getUser();
+            if (user) {
+                if (user.role === 'citizen') window.location.href = '/citizen/dashboard.html';
+                else if (user.role === 'ngo') window.location.href = '/ngo/dashboard.html';
+                else if (user.role === 'gov') window.location.href = '/government/dashboard.html';
+            }
+
+            // Fetch status metrics
+            await loadStatusMetrics();
+            
+            // Fetch public alerts
+            await loadPublicAlerts();
+        });
+
+        async function loadStatusMetrics() {
+            try {
+                const res = await api.request('/api/public/status');
+                document.getElementById('hero-sectors-count').innerText = res.total_mapped_sectors;
+                document.getElementById('hero-critical-count').innerText = res.critical_areas;
+                document.getElementById('hero-active-sos-count').innerText = res.active_sos;
+                document.getElementById('hero-resolved-count').innerText = res.resolved_sos_this_month;
+            } catch(e) {
+                console.error("Failed to load status metrics:", e);
+            }
+        }
+
+        async function loadPublicAlerts() {
+            try {
+                const alerts = await api.request('/api/public/alerts');
+                const feed = document.getElementById('public-alerts-feed');
+                const marquee = document.getElementById('alerts-marquee-text');
+                const marqueeBanner = document.getElementById('public-ticker-banner');
+                
+                feed.innerHTML = '';
+                if (alerts.length > 0) {
+                    // Show top marquee ticker
+                    marqueeBanner.style.display = 'block';
+                    marquee.innerText = alerts.map(a => `${a.title.toUpperCase()}: ${a.description}`).join(' | ');
+
+                    alerts.forEach(a => {
+                        const date = new Date(a.issued_at).toLocaleDateString('en-IN', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
+                        
+                        let borderStyle = '4px solid var(--color-low)';
+                        let badgeBg = 'rgba(46, 158, 91, 0.1)';
+                        let badgeColor = 'var(--color-low)';
+                        
+                        if (a.severity === 'Severe') {
+                            borderStyle = '4px solid var(--color-high)';
+                            badgeBg = 'rgba(217, 97, 43, 0.1)';
+                            badgeColor = 'var(--color-high)';
+                        } else if (a.severity === 'Extreme') {
+                            borderStyle = '4px solid var(--color-critical)';
+                            badgeBg = 'rgba(194, 43, 43, 0.1)';
+                            badgeColor = 'var(--color-critical)';
+                        } else if (a.severity === 'Moderate' || a.severity === 'Medium') {
+                            borderStyle = '4px solid var(--color-medium)';
+                            badgeBg = 'rgba(224, 165, 38, 0.1)';
+                            badgeColor = 'var(--color-medium)';
+                        }
+                        
+                        const div = document.createElement('div');
+                        div.className = 'glass-panel';
+                        div.style.padding = '14px';
+                        div.style.borderLeft = borderStyle;
+                        div.style.background = 'white';
+                        
+                        div.innerHTML = `
+                            <div style="display:flex; justify-content:space-between; margin-bottom: 4px; font-size: 13px;">
+                                <strong>${a.title}</strong>
+                                <span class="user-badge" style="font-size:10px; background:${badgeBg}; color:${badgeColor}; border-color:transparent; text-transform:uppercase;">${a.severity}</span>
+                            </div>
+                            <p style="font-size: 11px; color:var(--text-secondary); margin-bottom: 6px;">${a.description}</p>
+                            <div style="display:flex; justify-content:space-between; font-size: 9px; color:var(--text-muted);">
+                                <span><i class="fa-solid fa-clock"></i> Broadcasted ${date}</span>
+                                <span><b>Sector:</b> ${a.area_name}</span>
+                            </div>
+                        `;
+                        feed.appendChild(div);
+                    });
+                } else {
+                    marqueeBanner.style.display = 'none';
+                    feed.innerHTML = `
+                        <div style="text-align:center; padding:30px; color:var(--text-secondary); font-size:12px;" data-trn="no_notifs">
+                            No active advisories broadcasted at this moment.
+                        </div>
+                    `;
+                }
+            } catch(e) {
+                console.error("Alerts check failed:", e);
+            }
+        }
+
+        function toggleLanguage() {
+            currentLanguage = currentLanguage === 'en' ? 'ta' : 'en';
+            document.getElementById('btn-lang-toggle').innerText = currentLanguage === 'en' ? 'தமிழ்' : 'English';
+            
+            const elements = document.querySelectorAll('[data-trn]');
+            elements.forEach(el => {
+                const key = el.getAttribute('data-trn');
+                if (translations[currentLanguage][key]) {
+                    el.innerText = translations[currentLanguage][key];
+                }
+            });
+        }
+
+        function downloadMockPdf(type) {
+            // Mocks downloading the safety guide by compiling dynamic text data as file blob URL
+            const textContent = type === 'flood_safety'
+                ? "CHENNAI FLOOD SAFETY GUIDELINES\n\n1. Move to upper floors if water enters.\n2. Turn off electricity mains.\n3. Keep emergency kit ready with water, dry foods, and first aid.\n4. Call disaster command helpline: 1077."
+                : "CYCLONE PREPAREDNESS CHECKLIST\n\n1. Anchor loose roof sheets and clean drains.\n2. Store drinking water for 3 days.\n3. Disconnect power lines if high winds start.\n4. Stay indoors until official all-clear is broadcasted.";
+            
+            const blob = new Blob([textContent], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${type}_guide.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>

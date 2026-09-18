@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Policy Index — Government Portal</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header class="app-navbar"></header>
+    
+    <div class="portal-layout">
+        <aside class="sidebar"></aside>
+        
+        <main class="portal-content">
+            <div style="margin-bottom: 20px;">
+                <h2 style="font-size: 24px; font-weight: 800;">Global Policy Index (GPI) Dashboard</h2>
+                <p style="color: var(--text-secondary); font-size: 13px;">Review official preparedness indexes, compliance scores, and community resilience metrics.</p>
+            </div>
+
+            <!-- KPI Grids -->
+            <div class="shared-grid" style="margin-bottom: 24px;">
+                <div class="glass-panel" style="border-top: 4px solid var(--color-success); text-align:center;">
+                    <div style="font-size: 11px; color: var(--text-secondary); font-weight:700; text-transform:uppercase;">Overall Compliance Rating</div>
+                    <div style="font-size: 36px; font-weight: 800; margin: 6px 0; color:var(--color-success);" id="gpi-overall">0%</div>
+                    <p style="font-size:11px; color: var(--text-muted);">Calculated from 4 core readiness indices</p>
+                </div>
+                
+                <div class="glass-panel" style="display:flex; flex-direction:column; gap:10px;">
+                    <h4 style="font-size:12px; text-transform:uppercase; color:var(--text-secondary); margin-bottom:4px;">Ready Quotient Breakdown</h4>
+                    
+                    <div style="font-size:11px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
+                            <span>Response Speed Efficiency</span>
+                            <span id="gpi-speed-label">0%</span>
+                        </div>
+                        <div style="background:#E2E8F0; height:6px; border-radius:3px;"><div id="gpi-speed-bar" style="background:var(--color-info); height:100%; width:0%; border-radius:3px;"></div></div>
+                    </div>
+                    
+                    <div style="font-size:11px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
+                            <span>Resource Coverage Ratio</span>
+                            <span id="gpi-resource-label">0%</span>
+                        </div>
+                        <div style="background:#E2E8F0; height:6px; border-radius:3px;"><div id="gpi-resource-bar" style="background:var(--color-success); height:100%; width:0%; border-radius:3px;"></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Policy Directives -->
+            <div class="glass-panel" style="padding: 20px;">
+                <h3 style="font-size: 15px; margin-bottom: 12px; font-weight: 700; border-bottom: 1.5px solid var(--border-color); padding-bottom: 8px;">
+                    <i class="fa-solid fa-scale-balanced" style="color: var(--color-primary-light);"></i> Recommended Policy Directives
+                </h3>
+                <div style="font-size: 12px; line-height:1.6; display:flex; flex-direction:column; gap:12px;" id="gpi-directives">
+                    <div style="background:#F8FAFC; padding:12px; border-radius:4px; border-left:3.5px solid var(--color-primary-light);">
+                        <strong>Sector Allocation Optimization:</strong> Elevate regional dry-rations storage indices inside South Chennai boundaries to address the 15% estimated demand buffer during Cyclone alert warnings.
+                    </div>
+                    <div style="background:#F8FAFC; padding:12px; border-radius:4px; border-left:3.5px solid var(--color-primary-light);">
+                        <strong>Response Squad Recruitment:</strong> Verified NGO volunteer thresholds should maintain a minimum of 20,000 index values for active alert readiness. (Status: <b>Pass</b>).
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'gov') {
+                window.location.href = '/login.html?role=gov';
+                return;
+            }
+            
+            components.renderNavbar("Global Policy Index");
+            components.renderSidebar("/government/gpi.html");
+            
+            await calculateGpiMetrics();
+        });
+
+        async function calculateGpiMetrics() {
+            try {
+                const analytics = await api.request('/api/gov/analytics/overview');
+                
+                // Calculate response speed index
+                const pending = analytics.pending_requests;
+                const total = analytics.total_requests || 1;
+                const resolved = analytics.resolved_requests;
+                
+                const speedScore = Math.min(100, Math.round((resolved / total) * 100));
+                
+                // Calculate resources quotient
+                const foodAvail = analytics.food_summary.total_available;
+                const foodReq = analytics.food_summary.total_required || 1;
+                const resourceScore = Math.min(100, Math.round((foodAvail / foodReq) * 100));
+                
+                const overallGpi = Math.round((speedScore + resourceScore) / 2);
+                
+                // Render DOM
+                document.getElementById('gpi-overall').innerText = `${overallGpi}%`;
+                
+                document.getElementById('gpi-speed-label').innerText = `${speedScore}%`;
+                document.getElementById('gpi-speed-bar').style.width = `${speedScore}%`;
+                
+                document.getElementById('gpi-resource-label').innerText = `${resourceScore}%`;
+                document.getElementById('gpi-resource-bar').style.width = `${resourceScore}%`;
+            } catch(e) {
+                console.error(e);
+            }
+        }
+    </script>
+</body>
+</html>

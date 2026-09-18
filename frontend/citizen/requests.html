@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Requests — Disaster Shield AI</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header class="app-navbar"></header>
+    
+    <div class="portal-layout">
+        <aside class="sidebar"></aside>
+        
+        <main class="portal-content">
+            <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h2 style="font-size: 24px; font-weight: 800;">My Distress Requests</h2>
+                    <p style="color: var(--text-secondary); font-size: 13px;">View status updates and assignment trail history for all requests submitted by you.</p>
+                </div>
+                <a href="/citizen/request-help.html" class="btn btn-primary" style="width: auto; font-weight:700;">
+                    <i class="fa-solid fa-plus"></i> Submit New Request
+                </a>
+            </div>
+
+            <div class="glass-panel" style="padding: 20px;">
+                <div id="requests-table-container">
+                    <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                        <i class="fa-solid fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 10px;"></i>
+                        <p>Fetching requests history...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'citizen') {
+                window.location.href = '/login.html?role=citizen';
+                return;
+            }
+            
+            components.renderNavbar("My Requests");
+            components.renderSidebar("/citizen/requests.html");
+            
+            await loadRequests();
+        });
+
+        async function loadRequests() {
+            try {
+                const list = await api.request('/api/citizen/sos');
+                
+                const cols = [
+                    { title: "ID", field: "id", render: (val) => `<b>#${val}</b>` },
+                    { title: "Emergency Type", field: "emergency_type", render: (val) => `<span style="font-weight:700;">${val}</span>` },
+                    { title: "People Affected", field: "people_affected", render: (val) => `${val} Person(s)` },
+                    { title: "Priority Score", field: "priority_score", render: (val) => {
+                        let color = 'var(--color-low)';
+                        if (val >= 25.0) color = 'var(--color-critical)';
+                        else if (val >= 15.0) color = 'var(--color-high)';
+                        else if (val >= 5.0) color = 'var(--color-medium)';
+                        return `<span style="color:${color}; font-weight:800;">${val.toFixed(1)}</span>`;
+                    }},
+                    { title: "Status", field: "status", render: (val) => {
+                        let badgeClass = 'role-citizen';
+                        if (val === 'pending') badgeClass = 'role-gov';
+                        else if (val === 'resolved') badgeClass = 'role-citizen';
+                        else badgeClass = 'role-ngo';
+                        return `<span class="user-badge ${badgeClass}">${val.toUpperCase()}</span>`;
+                    }},
+                    { title: "Created At", field: "created_at", render: (val) => new Date(val).toLocaleString('en-IN') },
+                    { title: "Action", field: "id", render: (val, row) => {
+                        return `<a href="/citizen/tracking.html?sos_id=${val}" class="btn btn-secondary" style="padding: 4px 8px; font-size:11px; width:auto; border-radius:4px;"><i class="fa-solid fa-map-location-dot"></i> Track</a>`;
+                    }}
+                ];
+                
+                components.renderDataTable('requests-table-container', cols, list);
+            } catch(e) {
+                document.getElementById('requests-table-container').innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: var(--color-critical);">
+                        <i class="fa-solid fa-circle-xmark" style="font-size: 24px; margin-bottom: 10px;"></i>
+                        <p>Failed to load requests history: ${e.message || 'Server error'}</p>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

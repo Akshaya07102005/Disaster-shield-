@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disaster Shield AI — Authentication Portal</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body style="background-color: var(--bg-main); color: var(--text-primary); font-family: 'Inter', sans-serif; display: flex; flex-direction: column; min-height: 100vh;">
+    
+    <!-- Top Header Bar -->
+    <header class="app-navbar" style="position: sticky; top: 0; z-index: 1000; box-shadow: var(--shadow-md);">
+        <div class="navbar-brand" onclick="window.location.href='/'" style="cursor: pointer;">
+            <i class="fa-solid fa-shield-halved" style="color: var(--color-critical); margin-right: 8px;"></i>
+            <span style="font-weight: 800; letter-spacing: 0.03em;">DISASTER SHIELD AI — CHENNAI</span>
+        </div>
+        <div style="display: flex; gap: 12px; align-items: center;">
+            <a href="/" class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px; text-decoration: none; width: auto; font-weight: 700; border-radius: 4px;">
+                <i class="fa-solid fa-house"></i> Home
+            </a>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 40px 20px;">
+        <div class="glass-panel auth-card" style="box-shadow: var(--shadow-lg); border-top: 5px solid var(--color-primary-light);">
+            <div class="auth-header">
+                <div class="auth-logo" onclick="window.location.href='/'" style="cursor: pointer;">
+                    <i class="fa-solid fa-shield-halved" style="color: var(--color-critical);"></i> DISASTER SHIELD AI
+                </div>
+                <div class="auth-subtitle">Official Chennai Operations Authentication Portal</div>
+            </div>
+
+            <!-- Role Tabs Selector -->
+            <div class="auth-tabs" style="margin-bottom: 20px;">
+                <div class="auth-tab active" id="tab-citizen" onclick="switchRole('citizen')">Citizen</div>
+                <div class="auth-tab" id="tab-ngo" onclick="switchRole('ngo')">NGO Fleet</div>
+                <div class="auth-tab" id="tab-gov" onclick="switchRole('gov')">Government</div>
+            </div>
+
+            <form id="form-login" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label class="form-label" for="login-email">Official / Registered Email</label>
+                    <input class="form-control" type="email" id="login-email" required placeholder="E.g., name@domain.com" style="padding: 10px 14px; font-size:13px;">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="login-password">Password</label>
+                    <input class="form-control" type="password" id="login-password" required placeholder="••••••••" style="padding: 10px 14px; font-size:13px;">
+                </div>
+
+                <!-- Gov Access Warning -->
+                <div id="gov-note" style="display: none; background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59,130,246,0.2); padding: 10px; border-radius: 4px; font-size: 11px; color: var(--color-primary-light); margin-bottom: 12px; line-height: 1.4;">
+                    <i class="fa-solid fa-circle-info"></i> <b>Access Notice:</b> Government accounts require pre-provisioned credentials. Self-registration is disabled for security compliance.
+                </div>
+
+                <button class="btn btn-primary" type="submit" style="margin-top: 10px; font-weight:700; padding:12px;">
+                    <i class="fa-solid fa-right-from-bracket"></i> Sign In
+                </button>
+                
+                <div id="login-error" style="color: var(--color-critical); font-size: 12px; margin-top: 12px; text-align: center; display: none; font-weight: 600;"></div>
+            </form>
+
+            <!-- Quick Demo 1-Click Login Section -->
+            <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed var(--border-color); text-align: center;">
+                <div style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.05em;">
+                    ⚡ Quick Demo One-Click Access
+                </div>
+                <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+                    <button type="button" onclick="quickLogin('admin@gov.in', 'admin123', 'gov')" class="btn btn-secondary" style="font-size: 11px; padding: 6px 10px; border-color: rgba(59, 130, 246, 0.4); color: #93c5fd;">
+                        🏛️ Gov Admin
+                    </button>
+                    <button type="button" onclick="quickLogin('citizen@test.com', 'citizen123', 'citizen')" class="btn btn-secondary" style="font-size: 11px; padding: 6px 10px; border-color: rgba(16, 185, 129, 0.4); color: #6ee7b7;">
+                        👤 Citizen
+                    </button>
+                    <button type="button" onclick="quickLogin('ngo@test.org', 'ngo123', 'ngo')" class="btn btn-secondary" style="font-size: 11px; padding: 6px 10px; border-color: rgba(245, 158, 11, 0.4); color: #fcd34d;">
+                        🚑 NGO Fleet
+                    </button>
+                </div>
+            </div>
+
+            <div style="margin-top: 20px; text-align: center; font-size: 13px; color: var(--text-secondary); display:flex; flex-direction:column; gap:8px;">
+                <div id="reg-link-wrapper">
+                    Don't have an account? <a href="/register.html" style="color: var(--color-primary-light); font-weight:700; text-decoration:none;">Register here</a>
+                </div>
+                <div>
+                    <a href="/" style="color: var(--text-secondary); text-decoration:none; font-size:12px;"><i class="fa-solid fa-angle-left"></i> Continue as Guest</a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Unified Footer with Disclaimer -->
+    <footer style="background-color: var(--color-primary); color: white; padding: 40px 20px; font-size: 12px; border-top:3px solid var(--color-primary-light);">
+        <div class="citizen-container" style="display:grid; grid-template-columns: 1.5fr 1fr; gap:30px;">
+            <div>
+                <strong style="font-size: 13px; display:block; margin-bottom: 6px;">Official Disclaimer Notice</strong>
+                <p style="color: rgba(255,255,255,0.7); line-height: 1.45;">
+                    This platform is an official government-linked coordinates coordinator. In case of life-threatening emergencies, do not wait for dashboard dispatches — immediately dial 101, 108 or 1077 on landlines. All SOS transmissions are logged for audit compliance.
+                </p>
+                <div style="margin-top:15px; color:rgba(255,255,255,0.5);">
+                    <span>Data fresh rate: Live Sync</span> | <span>RTI Grievance Policy</span>
+                </div>
+            </div>
+            <div style="text-align: right;">
+                <strong style="display:block; margin-bottom: 8px;">DISASTER SHIELD AI</strong>
+                <a href="/" style="color:rgba(255,255,255,0.8); text-decoration:none; margin-left:10px;">Home</a>
+                <a href="/login.html" style="color:rgba(255,255,255,0.8); text-decoration:none; margin-left:10px;">Login</a>
+                <div style="margin-top:20px; color:rgba(255,255,255,0.4);">
+                    &copy; 2026 Chennai Disaster Operations. All rights reserved.
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="/js/api.js"></script>
+    <script>
+        let currentRole = 'citizen';
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            const params = new URLSearchParams(window.location.search);
+            const roleParam = params.get('role');
+            if (roleParam && ['citizen', 'ngo', 'gov'].includes(roleParam)) {
+                switchRole(roleParam);
+            }
+
+            const token = api.getToken();
+            if (token) {
+                const userObj = api.getUser();
+                if (userObj) {
+                    api.redirectBasedOnRole(userObj.role);
+                }
+            }
+        });
+
+        function switchRole(role) {
+            currentRole = role;
+            
+            document.querySelectorAll('.auth-tab').forEach(tab => tab.classList.remove('active'));
+            const tabElem = document.getElementById(`tab-${role}`);
+            if (tabElem) tabElem.classList.add('active');
+
+            const govNote = document.getElementById('gov-note');
+            const regWrapper = document.getElementById('reg-link-wrapper');
+            
+            if (govNote && regWrapper) {
+                if (role === 'gov') {
+                    govNote.style.display = 'block';
+                    regWrapper.style.display = 'none';
+                } else {
+                    govNote.style.display = 'none';
+                    regWrapper.style.display = 'block';
+                }
+            }
+
+            const errorDiv = document.getElementById('login-error');
+            if (errorDiv) errorDiv.style.display = 'none';
+        }
+
+        async function quickLogin(email, password, role) {
+            switchRole(role);
+            document.getElementById('login-email').value = email;
+            document.getElementById('login-password').value = password;
+            const errorDiv = document.getElementById('login-error');
+            if (errorDiv) errorDiv.style.display = 'none';
+            try {
+                const res = await api.login(email, password);
+                api.redirectBasedOnRole(res.user.role || role);
+            } catch (error) {
+                if (errorDiv) {
+                    errorDiv.innerText = error.message || 'Login failed.';
+                    errorDiv.style.display = 'block';
+                }
+            }
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value.trim();
+            const password = document.getElementById('login-password').value;
+            const errorDiv = document.getElementById('login-error');
+            
+            errorDiv.style.display = 'none';
+            
+            try {
+                const res = await api.login(email, password);
+                // Smoothly route to the user's role
+                api.redirectBasedOnRole(res.user.role);
+            } catch (error) {
+                errorDiv.innerText = error.message || 'Incorrect email or password. Please verify and try again.';
+                errorDiv.style.display = 'block';
+            }
+        }
+    </script>
+</body>
+</html>

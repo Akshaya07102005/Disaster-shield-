@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alert Manager — Government Portal</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header class="app-navbar"></header>
+    
+    <div class="portal-layout">
+        <aside class="sidebar"></aside>
+        
+        <main class="portal-content">
+            <div style="margin-bottom: 20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                <div>
+                    <h2 style="font-size: 24px; font-weight: 800;">Emergency Warning Broadcasts</h2>
+                    <p style="color: var(--text-secondary); font-size: 13px;">Publish regional alerts to citizens' notification feeds and warning panels.</p>
+                </div>
+                <button class="btn btn-primary" onclick="openAlertModal()" style="width:auto; font-weight:700;">
+                    <i class="fa-solid fa-bullhorn"></i> Broadcast Warning
+                </button>
+            </div>
+
+            <!-- List of active warnings -->
+            <div class="glass-panel" style="padding: 20px;">
+                <h3 style="font-size: 15px; margin-bottom: 12px; font-weight: 700; border-bottom: 1.5px solid var(--border-color); padding-bottom: 8px;">
+                    <i class="fa-solid fa-clock-rotate-left" style="color: var(--color-primary-light);"></i> Active Warnings Archives
+                </h3>
+                <div id="alerts-table-container">
+                    <div style="text-align: center; color: var(--text-muted); padding: 40px;">
+                        <i class="fa-solid fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 10px;"></i>
+                        <p>Loading alerts index...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Alert Modal -->
+    <div id="alert-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.4); z-index: 10000; align-items: center; justify-content: center; padding: 20px;">
+        <div class="glass-panel" style="width: 100%; max-width: 440px; padding: 24px;">
+            <h3 style="margin-bottom: 16px;"><i class="fa-solid fa-bullhorn"></i> Dispatch Warning Alert</h3>
+            <form onsubmit="handleSendAlert(event)">
+                <div class="form-group">
+                    <label class="form-label">Alert Header Title</label>
+                    <input class="form-control" type="text" id="alert-title" required placeholder="E.g., Severe Rain Warning">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Disaster Hazard Category</label>
+                    <select class="form-control" id="alert-type" required>
+                        <option value="Flood">Flood / Inundation</option>
+                        <option value="Cyclone">Cyclone / Storm</option>
+                        <option value="Tsunami">Tsunami / Wave</option>
+                        <option value="Earthquake">Earthquake</option>
+                    </select>
+                </div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                    <div class="form-group">
+                        <label class="form-label">Severity Level</label>
+                        <select class="form-control" id="alert-severity" required>
+                            <option value="Moderate">Moderate</option>
+                            <option value="Severe">Severe</option>
+                            <option value="Extreme">Extreme (Immediate Evac)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Expiration Limit</label>
+                        <select class="form-control" id="alert-expiry">
+                            <option value="6">6 Hours</option>
+                            <option value="12">12 Hours</option>
+                            <option value="24" selected>24 Hours</option>
+                            <option value="48">48 Hours</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Target Sector (Optional)</label>
+                    <select class="form-control" id="alert-area-select">
+                        <option value="">City-Wide Broadcast</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Emergency Advice Details</label>
+                    <textarea class="form-control" id="alert-desc" rows="3" required placeholder="Safety instructions..."></textarea>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button class="btn btn-primary" type="submit">Broadcast Warning</button>
+                    <button class="btn btn-secondary" type="button" onclick="closeAlertModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'gov') {
+                window.location.href = '/login.html?role=gov';
+                return;
+            }
+            
+            components.renderNavbar("Alert Manager");
+            components.renderSidebar("/government/alerts.html");
+            
+            await loadAreasList();
+            await loadAlertsList();
+        });
+
+        async function loadAreasList() {
+            try {
+                const list = await api.request('/api/public/areas');
+                const sel = document.getElementById('alert-area-select');
+                list.forEach(a => {
+                    const opt = document.createElement('option');
+                    opt.value = a.id;
+                    opt.innerText = a.area_name;
+                    sel.appendChild(opt);
+                });
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        async function loadAlertsList() {
+            try {
+                const list = await api.request('/api/gov/alerts');
+                
+                const cols = [
+                    { title: "ID", field: "id", render: (val) => `<b>#${val}</b>` },
+                    { title: "Alert Headline Title", field: "title", render: (val) => `<strong>${val}</strong>` },
+                    { title: "Hazard", field: "disaster_type" },
+                    { title: "Area Sector", field: "area_name", render: (val) => val || 'City-Wide Summary' },
+                    { title: "Severity", field: "severity", render: (val) => {
+                        let color = 'var(--color-medium)';
+                        if (val === 'Extreme') color = 'var(--color-critical)';
+                        else if (val === 'Severe') color = 'var(--color-high)';
+                        return `<span class="user-badge" style="background:rgba(255,255,255,0.06); color:${color}; border-color:${color}; font-size:10px; font-weight:700;">${val.toUpperCase()}</span>`;
+                    }},
+                    { title: "Expiration Limit", field: "expires_at", render: (val) => new Date(val).toLocaleString('en-IN') }
+                ];
+                
+                components.renderDataTable('alerts-table-container', cols, list);
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        function openAlertModal() {
+            document.getElementById('alert-modal').style.display = 'flex';
+        }
+
+        function closeAlertModal() {
+            document.getElementById('alert-modal').style.display = 'none';
+        }
+
+        async function handleSendAlert(e) {
+            e.preventDefault();
+            const title = document.getElementById('alert-title').value.trim();
+            const type = document.getElementById('alert-type').value;
+            const severity = document.getElementById('alert-severity').value;
+            const expiry = parseInt(document.getElementById('alert-expiry').value);
+            const areaId = document.getElementById('alert-area-select').value;
+            const desc = document.getElementById('alert-desc').value.trim();
+            
+            const payload = {
+                title: title,
+                description: desc,
+                disaster_type: type,
+                severity: severity,
+                expires_in_hours: expiry
+            };
+            if (areaId) payload.area_id = parseInt(areaId);
+            
+            try {
+                await api.request('/api/gov/alerts', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                closeAlertModal();
+                alert("Emergency alert warning broadcasted successfully!");
+                
+                // Clear fields
+                document.getElementById('alert-title').value = '';
+                document.getElementById('alert-desc').value = '';
+                
+                await loadAlertsList();
+            } catch(e) {
+                alert(`Broadcast failed: ${e.message}`);
+            }
+        }
+    </script>
+</body>
+</html>

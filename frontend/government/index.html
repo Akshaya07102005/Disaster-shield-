@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disaster Shield AI — Central Command Dashboard</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Leaflet.js -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+</head>
+<body style="background-color: var(--bg-main); color: var(--text-primary); min-height: 100vh;">
+    
+    <header class="app-navbar">
+        <div class="navbar-brand">
+            <i class="fa-solid fa-shield-halved" style="color: var(--color-critical);"></i>
+            <span>DISASTER SHIELD CENTRAL COMMAND</span>
+            <span class="user-badge" id="test-mode-badge" style="background: rgba(194, 43, 43, 0.15); color: var(--color-critical); border-color: var(--color-critical); margin-left: 10px; display: none; font-size: 10px; font-weight: 800; animation: pulse 1.5s infinite;"><i class="fa-solid fa-bug"></i> TEST MODE ACTIVE</span>
+        </div>
+        <div class="navbar-user">
+            <!-- V4 Test Mode Toggle -->
+            <label class="control-item" style="color: white; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px; cursor: pointer; margin-right: 15px;">
+                <input type="checkbox" id="toggle-test-mode" onchange="toggleTestMode(this.checked)" style="accent-color: var(--color-critical); width: 14px; height: 14px;"> Test Mode
+            </label>
+            
+            <!-- V2 Notification Center -->
+            <div class="notify-center" onclick="toggleNotificationDropdown(event)">
+                <i class="fa-solid fa-bell" style="font-size: 18px; color: white;"></i>
+                <span class="notify-badge" id="navbar-notify-count" style="display: none;">0</span>
+                <div class="notify-dropdown" id="navbar-notify-dropdown" style="display: none;">
+                    <div style="padding: 10px 14px; border-bottom: 1.5px solid var(--border-color); font-weight: 700; font-size: 13px; color: var(--color-primary); display: flex; justify-content: space-between; align-items: center;">
+                        <span>NOTIFICATIONS</span>
+                        <a href="#" onclick="markAllNotificationsRead(event)" style="font-size: 11px; text-decoration: none; color: var(--color-primary-light);">Mark all read</a>
+                    </div>
+                    <div id="notify-dropdown-list">
+                        <div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 12px;">No active alerts.</div>
+                    </div>
+                </div>
+            </div>
+            
+            <span class="user-badge" id="gov-user-name">Loading Officer...</span>
+            <button class="btn btn-secondary" onclick="api.logout()" style="padding: 6px 12px; width: auto; font-size: 12px;">
+                <i class="fa-solid fa-right-from-bracket"></i> Logout
+            </button>
+        </div>
+    </header>
+
+    <!-- V2 KPI Grid Strip -->
+    <div style="padding: 16px 16px 0 16px;">
+        <div class="kpi-grid">
+            <div class="kpi-card" style="border-top: 4px solid var(--color-critical);">
+                <div class="kpi-title">ACTIVE SOS QUEUE</div>
+                <div class="kpi-value" id="kpi-active-sos">0</div>
+            </div>
+            <div class="kpi-card" style="border-top: 4px solid var(--color-high);">
+                <div class="kpi-title">CRITICAL AREAS</div>
+                <div class="kpi-value" id="kpi-critical-areas">0</div>
+            </div>
+            <div class="kpi-card" style="border-top: 4px solid var(--color-medium);">
+                <div class="kpi-title">ACTIVE MISSIONS</div>
+                <div class="kpi-value" id="kpi-active-missions">0</div>
+            </div>
+            <div class="kpi-card" style="border-top: 4px solid var(--color-low);">
+                <div class="kpi-title">RESOURCES DEPLOYED</div>
+                <div class="kpi-value" id="kpi-resources-deployed">0</div>
+            </div>
+            <div class="kpi-card" style="border-top: 4px solid var(--color-info);">
+                <div class="kpi-title">AVG RESPONSE TIME</div>
+                <div class="kpi-value" id="kpi-avg-response">18.5m</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Workspace -->
+    <main class="command-grid" style="height: calc(100vh - 180px);">
+        
+        <!-- Left Sidebar: SOS Dispatch Queue & Audit Logs -->
+        <div class="grid-sidebar glass-panel">
+            <h3 style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; font-size: 15px;">
+                <span><i class="fa-solid fa-list-check" style="color: var(--color-critical);"></i> SOS Dispatch Queue</span>
+                <span style="font-size: 10px; color: var(--text-secondary); background: #E2E8F0; padding: 2px 6px; border-radius: 4px;">SLA TRACKED</span>
+            </h3>
+            
+            <div class="sos-list" id="gov-sos-queue" style="flex: 1; overflow-y: auto; max-height: 320px; margin-bottom: 12px;">
+                <div style="text-align: center; color: var(--text-muted); padding: 30px;">
+                    <i class="fa-solid fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 8px;"></i>
+                    <p>Fetching active requests...</p>
+                </div>
+            </div>
+
+            <!-- V2 Live Dispatch Audit Trail Panel -->
+            <div style="border-top: 1.5px solid var(--border-color); padding-top: 12px;">
+                <h4 style="font-size: 12px; font-weight: 700; margin-bottom: 8px; color: var(--color-primary); display: flex; justify-content: space-between; align-items: center;">
+                    <span><i class="fa-solid fa-clock-rotate-left"></i> Live Command Audit Log</span>
+                    <i class="fa-solid fa-rotate" onclick="refreshAuditLogs()" style="cursor: pointer; font-size: 10px;"></i>
+                </h4>
+                <div class="audit-list" id="gov-audit-logs">
+                    <div style="padding: 10px; text-align: center; font-size: 11px;">Loading trail...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center: Interactive Leaflet Map & Heatmap overlay -->
+        <div class="grid-map-container glass-panel" style="position: relative; padding: 0; overflow: hidden; height: 100%;">
+            
+            <!-- Map Layer Overlay Controls -->
+            <div class="map-overlay-controls" style="background: white; border: 1px solid var(--border-color); box-shadow: var(--shadow-md);">
+                <h4 style="font-size: 11px; margin-bottom: 8px; border-bottom: 1.5px solid var(--border-color); padding-bottom: 4px; color: var(--color-primary); font-weight:700; letter-spacing: 0.05em;">MAP CONTROL OVERLAYS</h4>
+                <label class="control-item">
+                    <input type="checkbox" id="layer-risk" checked onchange="toggleLayer('risk', this.checked)"> Risk Zones (426 Areas)
+                </label>
+                <label class="control-item">
+                    <input type="checkbox" id="layer-sos" checked onchange="toggleLayer('sos', this.checked)"> Active SOS Requests
+                </label>
+                <label class="control-item">
+                    <input type="checkbox" id="layer-heatmap" onchange="toggleHeatmapLayer(this.checked)"> SOS Density Heatmap
+                </label>
+                <label class="control-item">
+                    <input type="checkbox" id="layer-shelters" checked onchange="toggleLayer('shelters', this.checked)"> Relief Shelters
+                </label>
+                <label class="control-item">
+                    <input type="checkbox" id="layer-hospitals" checked onchange="toggleLayer('hospitals', this.checked)"> Emergency Hospitals
+                </label>
+                <label class="control-item">
+                    <input type="checkbox" id="layer-teams" checked onchange="toggleLayer('teams', this.checked)"> NGO Rescue Teams
+                </label>
+                
+                <button class="btn btn-primary" onclick="openAlertModal()" style="margin-top: 10px; font-size: 11px; padding: 8px 12px;">
+                    <i class="fa-solid fa-bullhorn"></i> Broadcast Emergency Alert
+                </button>
+            </div>
+            
+            <div id="map" style="height: 100%;"></div>
+        </div>
+
+        <!-- Right Sidebar: AI Resource Optimizer, Chat Assistant & Reports -->
+        <div class="grid-sidebar" style="gap: 16px;">
+            
+            <!-- V2 AI Resource Optimizer Widget -->
+            <div class="glass-panel" style="padding: 16px;">
+                <h3 style="margin-bottom: 10px; font-size: 14px; display: flex; align-items: center; justify-content: space-between;">
+                    <span><i class="fa-solid fa-wand-magic-sparkles" style="color: var(--color-info);"></i> AI Resource Optimizer</span>
+                    <button class="btn btn-secondary" onclick="runResourceOptimizer()" id="btn-optimize" style="width: auto; padding: 4px 8px; font-size: 10px; border-radius: 4px;">
+                        Optimize
+                    </button>
+                </h3>
+                <div id="optimize-results" style="font-size: 11px; max-height: 80px; overflow-y: auto; color: var(--text-secondary); line-height: 1.3;">
+                    Click optimize to scan city-wide surpluses and deficits.
+                </div>
+            </div>
+
+            <!-- Climate Analysis & Exporter -->
+            <div class="glass-panel" style="padding: 16px;">
+                <h3 style="margin-bottom: 10px; font-size: 14px;"><i class="fa-solid fa-cloud-sun-rain" style="color: var(--color-info);"></i> Weather & Situation Exporter</h3>
+                
+                <div class="form-group" style="margin-bottom: 10px;">
+                    <select class="form-control" id="report-area-select" style="padding: 6px 10px; font-size: 12px;">
+                        <option value="">City-Wide Briefing Summary</option>
+                    </select>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <button class="btn btn-primary" onclick="generateReport()" id="btn-gen-report" style="font-size: 12px; padding: 8px; font-weight:700;">
+                        <i class="fa-solid fa-gears"></i> Compile General Briefing
+                    </button>
+                    <button class="btn btn-secondary" onclick="runWeatherAnalysis()" id="btn-weather-report" style="font-size: 12px; padding: 8px; font-weight:700; background: rgba(59,130,246,0.08); border-color: rgba(59,130,246,0.3); color: var(--color-primary-light);">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Climatic Analysis
+                    </button>
+                </div>
+                <div style="margin-top: 8px; max-height: 80px; overflow-y: auto;" id="pdf-report-history"></div>
+            </div>
+
+            <!-- Developer Simulation Panel -->
+            <div class="glass-panel" id="dev-sim-panel" style="padding: 16px; border: 1.5px dashed var(--color-critical); opacity: 0.5; pointer-events: none;">
+                <h3 style="margin-bottom: 10px; font-size: 14px; color: var(--color-critical); display: flex; justify-content: space-between; align-items: center;">
+                    <span><i class="fa-solid fa-bug"></i> Test Simulator</span>
+                    <span style="font-size: 9px; font-weight:800; background:rgba(194,43,43,0.1); padding:2px 6px; border-radius:4px;" id="sim-status-badge">STANDBY</span>
+                </h3>
+                
+                <div class="form-group" style="margin-bottom: 8px;">
+                    <select class="form-control" id="sim-area-select" style="padding: 5px; font-size: 11px;">
+                        <option value="">Select target sector...</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 10px;">
+                    <select class="form-control" id="sim-type-select" style="padding: 5px; font-size: 11px;">
+                        <option value="Flood">Flood Emergency</option>
+                        <option value="Cyclone">Cyclone High Wind</option>
+                        <option value="Medical">Medical Assistance</option>
+                        <option value="Trapped">Trapped / Inundated</option>
+                    </select>
+                </div>
+
+                <button class="btn btn-primary" onclick="simulateSosRequest()" id="btn-sim-sos" style="font-size: 11px; padding: 6px; background: var(--color-critical); border-color: var(--color-critical); font-weight:700; margin-bottom: 8px;">
+                    <i class="fa-solid fa-circle-radiation"></i> Trigger Simulated SOS
+                </button>
+                
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-secondary" onclick="seedTestData()" style="font-size: 10px; padding: 5px; flex: 1;">Seed QA Batch</button>
+                    <button class="btn btn-secondary" onclick="purgeTestData()" style="font-size: 10px; padding: 5px; flex: 1; border-color: var(--color-critical); color: var(--color-critical);">Purge Test Data</button>
+                </div>
+            </div>
+            
+            <!-- AI Command Chat Assistant -->
+            <div class="glass-panel ai-chat-box" style="flex: 1; padding: 16px; display: flex; flex-direction: column; min-height: 240px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <h3 style="margin: 0; font-size: 13px; display:flex; align-items:center; gap:6px;">
+                        <i class="fa-solid fa-robot" style="color: var(--color-success);"></i> AI Decision Assistant
+                    </h3>
+                    <span class="badge badge-success" style="font-size: 9px;">40 Q&A</span>
+                </div>
+                
+                <div class="chat-history" id="ai-chat-history" style="flex: 1; overflow-y: auto; margin-bottom: 8px; max-height: 150px;">
+                    <div class="chat-bubble ai">
+                        Officer, I can query risk levels, fetch SOS statistics, or provide response suggestions from our 40 verified disaster guidelines. Select a question below or type your own:
+                    </div>
+                </div>
+
+                <!-- Quick Suggested Questions Selector -->
+                <div style="margin-bottom: 6px;">
+                    <select id="gov-preset-q-select" class="form-control" onchange="if(this.value){ document.getElementById('ai-chat-input').value=this.value; sendAiMessage(); this.value=''; }" style="font-size: 11px; padding: 4px 8px; height: 28px; background: #F8FAFC;">
+                        <option value="">💡 Pick from 40 Suggested Questions...</option>
+                        <optgroup label="🌊 Flood & Rain">
+                            <option value="What should I do during a flood?">What should I do during a flood?</option>
+                            <option value="What is the waterlogging protocol in Chennai?">What is the waterlogging protocol in Chennai?</option>
+                            <option value="How to purify drinking water during a flood?">How to purify drinking water during a flood?</option>
+                            <option value="What to do if floodwater enters my house?">What to do if floodwater enters my house?</option>
+                            <option value="How to safely evacuate a flooded area?">How to safely evacuate a flooded area?</option>
+                            <option value="What should I do if a car gets caught in floodwater?">What should I do if a car gets caught in floodwater?</option>
+                        </optgroup>
+                        <optgroup label="🌀 Cyclone & Storm">
+                            <option value="How to prepare for a cyclone?">How to prepare for a cyclone?</option>
+                            <option value="What should I do during a severe cyclonic storm?">What should I do during a severe cyclonic storm?</option>
+                            <option value="What precautions should be taken after a cyclone passes?">What precautions should be taken after a cyclone passes?</option>
+                            <option value="What is the average rainfall during Chennai monsoons?">What is the average rainfall during Chennai monsoons?</option>
+                            <option value="How to report a fallen tree or broken electric pole?">How to report a fallen tree or broken electric pole?</option>
+                        </optgroup>
+                        <optgroup label="📞 Helplines">
+                            <option value="What are the emergency contact numbers in Chennai?">What are the emergency contact numbers in Chennai?</option>
+                            <option value="How to contact the Greater Chennai Corporation?">How to contact the Greater Chennai Corporation?</option>
+                            <option value="How to contact the Electricity Board for power hazards?">How to contact the Electricity Board for power hazards?</option>
+                            <option value="How to contact Tamil Nadu State Disaster Management Authority (TNSDMA)?">How to contact TNSDMA?</option>
+                        </optgroup>
+                        <optgroup label="🎒 Survival Kit & Food/Water">
+                            <option value="What should be in an emergency survival kit?">What should be in an emergency survival kit?</option>
+                            <option value="How much drinking water should be stored per person?">How much drinking water should be stored per person?</option>
+                            <option value="How to safely store food during power outages?">How to safely store food during power outages?</option>
+                            <option value="What documents should be kept in a waterproof bag?">What documents should be kept in a waterproof bag?</option>
+                        </optgroup>
+                        <optgroup label="🏥 First Aid & Medical">
+                            <option value="First aid for electric shock?">First aid for electric shock?</option>
+                            <option value="How to treat dehydration or heat stroke?">How to treat dehydration or heat stroke?</option>
+                            <option value="What to do if someone is drowning or submerged?">What to do if someone is drowning or submerged?</option>
+                            <option value="How to handle snake bites or waterborne infections in floods?">How to handle snake bites in floods?</option>
+                            <option value="How to handle food poisoning in emergency camps?">How to handle food poisoning in emergency camps?</option>
+                        </optgroup>
+                        <optgroup label="🏫 Shelters & Relief Camps">
+                            <option value="What are the rules for shelter occupancy?">What are the rules for shelter occupancy?</option>
+                            <option value="What is the maximum capacity of relief shelters?">What is the maximum capacity of relief shelters?</option>
+                            <option value="Are pets allowed in emergency shelters?">Are pets allowed in emergency shelters?</option>
+                            <option value="What medical facilities are available at relief camps?">What medical facilities are available at relief camps?</option>
+                        </optgroup>
+                        <optgroup label="📊 Risk & Zones">
+                            <option value="How is the area risk score calculated?">How is the area risk score calculated?</option>
+                            <option value="What does Risk Level Green, Yellow, Orange, and Red mean?">What does Risk Level Green, Yellow, Orange, Red mean?</option>
+                            <option value="What are the 15 zone boundaries of Chennai?">What are the 15 zone boundaries of Chennai?</option>
+                            <option value="What is the current risk level in Velachery?">What is the current risk level in Velachery?</option>
+                            <option value="What is the risk level in Pallikaranai and T. Nagar?">What is the risk level in Pallikaranai & T. Nagar?</option>
+                        </optgroup>
+                        <optgroup label="🆘 SOS & Rescue">
+                            <option value="How do citizens report emergencies using SOS?">How do citizens report emergencies using SOS?</option>
+                            <option value="How does the SOS priority scoring algorithm work?">How does the SOS priority scoring algorithm work?</option>
+                            <option value="How can family members track an active SOS rescue status?">How can family members track an active SOS rescue status?</option>
+                        </optgroup>
+                        <optgroup label="🤝 NGOs & Volunteers">
+                            <option value="How to sign up as a disaster response volunteer?">How to sign up as a disaster response volunteer?</option>
+                            <option value="How are rescue teams and inflatable boats deployed?">How are rescue teams and inflatable boats deployed?</option>
+                            <option value="How can an NGO get verified by the government?">How can an NGO get verified by the government?</option>
+                            <option value="How to request additional resources like boats, food, and medical kits?">How to request additional resources?</option>
+                        </optgroup>
+                    </select>
+                </div>
+                
+                <div style="display: flex; gap: 6px;">
+                    <input class="form-control" type="text" id="ai-chat-input" placeholder="Ask question..." onkeydown="if(event.key === 'Enter') sendAiMessage()" style="padding: 6px 10px; font-size: 11px;">
+                    <button class="btn btn-primary" onclick="sendAiMessage()" style="width: auto; padding: 6px 12px;">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+            
+        </div>
+        
+    </main>
+
+    <!-- Broadcast Alert Modal -->
+    <div id="alert-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); z-index: 10000; align-items: center; justify-content: center; padding: 20px;">
+        <div class="glass-panel" style="width: 100%; max-width: 480px; padding: 24px; border-radius: var(--radius-md);">
+            <h3 style="margin-bottom: 16px;"><i class="fa-solid fa-bullhorn" style="color: var(--color-medium);"></i> Broadcast Regional Alert</h3>
+            
+            <form onsubmit="handlePublishAlert(event)">
+                <div class="form-group">
+                    <label class="form-label">Alert Title</label>
+                    <input class="form-control" type="text" id="alert-title" required placeholder="E.g., Low-lying sector overflow warning">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Guidelines / Description</label>
+                    <textarea class="form-control" id="alert-desc" rows="3" required placeholder="Emergency safety steps..."></textarea>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div class="form-group">
+                        <label class="form-label">Disaster Type</label>
+                        <select class="form-control" id="alert-type" required>
+                            <option value="Flood">Flood</option>
+                            <option value="Cyclone">Cyclone</option>
+                            <option value="Heatwave">Heatwave</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Severity Level</label>
+                        <select class="form-control" id="alert-severity" required>
+                            <option value="Moderate">Moderate (Advisory)</option>
+                            <option value="Severe">Severe (Warning)</option>
+                            <option value="Extreme">Extreme (Evacuation Order)</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div class="form-group">
+                        <label class="form-label">Target Zone</label>
+                        <select class="form-control" id="alert-area">
+                            <option value="">City-Wide (All Zones)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Expires (Hours)</label>
+                        <input class="form-control" type="number" id="alert-expiry" min="1" value="24">
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button class="btn btn-primary" type="submit">Broadcast Now</button>
+                    <button class="btn btn-secondary" type="button" onclick="closeAlertModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/map.js"></script>
+    <script>
+        let ngosList = [];
+        let areasList = [];
+        let socket;
+        let heatmapLayersGroup = L.layerGroup();
+        let sosItems = []; // Keeps track of loaded items for SLA ticker increments
+        let isTestModeActive = false;
+        let wsEventCount = 0;
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            // Verify session role
+            const user = api.getUser();
+            if (!user || user.role !== 'gov') {
+                const session = await api.checkSession();
+                if (!session || session.user.role !== 'gov') {
+                    window.location.href = '/';
+                    return;
+                }
+            }
+            
+            document.getElementById('gov-user-name').innerText = `Officer: ${user.name}`;
+            
+            // Initialize map
+            initMap('map', (areaProperties) => {
+                document.getElementById('ai-chat-input').value = `What is the current risk level in ${areaProperties.name}?`;
+                sendAiMessage();
+            });
+            
+            heatmapLayersGroup.addTo(map);
+            
+            // Load initial V2 data
+            await refreshDashboardData();
+            await refreshAuditLogs();
+            await refreshNotificationBell();
+            
+            // Periodically refresh notifications & audit logs
+            setInterval(refreshNotificationBell, 10000);
+            setInterval(refreshAuditLogs, 15000);
+            
+            // Live SLA Tickers update (runs every second)
+            setInterval(updateSLATimersOnScreen, 1000);
+            
+            // WebSockets live sync
+            setupWebSockets();
+        });
+
+        // Toggle notifications dropdown view
+        function toggleNotificationDropdown(e) {
+            e.stopPropagation();
+            const el = document.getElementById('navbar-notify-dropdown');
+            el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        }
+
+        document.addEventListener('click', () => {
+            document.getElementById('navbar-notify-dropdown').style.display = 'none';
+        });
+
+        // Retrieve and render notifications
+        async function refreshNotificationBell() {
+            try {
+                const notifs = await api.request('/api/citizen/notifications');
+                const unreadCount = notifs.filter(n => !n.read).length;
+                const countBadge = document.getElementById('navbar-notify-count');
+                
+                if (unreadCount > 0) {
+                    countBadge.innerText = unreadCount;
+                    countBadge.style.display = 'flex';
+                } else {
+                    countBadge.style.display = 'none';
+                }
+                
+                const list = document.getElementById('notify-dropdown-list');
+                list.innerHTML = '';
+                
+                if (notifs.length === 0) {
+                    list.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-muted); font-size:12px;">No active notifications.</div>';
+                    return;
+                }
+                
+                notifs.slice(0, 5).forEach(n => {
+                    const item = document.createElement('div');
+                    item.className = `notify-item ${n.read ? '' : 'unread'}`;
+                    item.innerHTML = `
+                        <strong>${n.title}</strong><br/>
+                        <span style="font-size:11px; color:var(--text-secondary);">${n.body}</span>
+                    `;
+                    item.onclick = async () => {
+                        await api.request('/api/citizen/notifications', {
+                            method: 'PUT',
+                            body: JSON.stringify({ notification_id: n.id })
+                        });
+                        refreshNotificationBell();
+                    };
+                    list.appendChild(item);
+                });
+            } catch(e) {}
+        }
+
+        async function markAllNotificationsRead(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            try {
+                await api.request('/api/citizen/notifications', {
+                    method: 'PUT',
+                    body: JSON.stringify({})
+                });
+                refreshNotificationBell();
+            } catch(e) {}
+        }
+
+        // Retrieve and render live Audit Trail Logs
+        async function refreshAuditLogs() {
+            try {
+                const logs = await api.request('/api/gov/audit-log');
+                const list = document.getElementById('gov-audit-logs');
+                list.innerHTML = '';
+                
+                if (logs.length === 0) {
+                    list.innerHTML = '<div style="padding:10px; text-align:center; font-size:11px;">No audit activities logged.</div>';
+                    return;
+                }
+                
+                logs.slice(0, 15).forEach(l => {
+                    const time = new Date(l.created_at).toLocaleTimeString('en-IN', {hour: '2-digit', minute: '2-digit'});
+                    const div = document.createElement('div');
+                    div.className = 'audit-item';
+                    div.innerHTML = `
+                        <strong>${time} [${l.action_type.toUpperCase()}]</strong> by ${l.actor_name}: 
+                        <span>${l.details || 'Operational record updated.'}</span>
+                    `;
+                    list.appendChild(div);
+                });
+            } catch(e) {}
+        }
+
+        // AI Resource Optimizer trigger
+        async function runResourceOptimizer() {
+            const btn = document.getElementById('btn-optimize');
+            const output = document.getElementById('optimize-results');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            output.innerText = "AI scanning regional resource stockpiles...";
+            
+            try {
+                const res = await api.request('/api/gov/resources/optimize', { method: 'POST' });
+                output.innerHTML = '';
+                
+                if (res.suggestions.length === 0) {
+                    output.innerHTML = '<div style="color:var(--color-low);"><b>Optimal Balance:</b> No deficit reallocation transfers needed currently.</div>';
+                } else {
+                    res.suggestions.forEach(s => {
+                        const div = document.createElement('div');
+                        div.style.marginBottom = '6px';
+                        div.innerHTML = `
+                            <i class="fa-solid fa-right-left" style="color:var(--color-high);"></i> 
+                            Transfer <b>${s.quantity} units</b> of <b>${s.resource_type}</b> from <b>${s.from_area}</b> to <b>${s.to_area}</b>.<br/>
+                            <span style="color:var(--text-muted); font-size:10px;">${s.rationale}</span>
+                        `;
+                        output.appendChild(div);
+                    });
+                }
+                refreshAuditLogs();
+            } catch(e) {
+                output.innerText = "AI Analysis failed: " + e.message;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = "Optimize";
+            }
+        }
+
+        // Map heatmap overlay rendering (simulated circle grids)
+        async function toggleHeatmapLayer(checked) {
+            heatmapLayersGroup.clearLayers();
+            if (!checked) return;
+            
+            try {
+                const heatPoints = await api.request('/api/gov/sos/heatmap');
+                heatPoints.forEach(pt => {
+                    const circle = L.circle([pt.lat, pt.lng], {
+                        radius: 400 * Math.max(1, pt.intensity),
+                        color: '#C22B2B',
+                        fillColor: '#C22B2B',
+                        fillOpacity: 0.16,
+                        stroke: false
+                    });
+                    heatmapLayersGroup.addLayer(circle);
+                });
+            } catch(e) {}
+        }
+
+        async function refreshDashboardData() {
+            try {
+                // 1. Fetch dynamic KPIs metrics
+                const kpis = await api.request('/api/gov/kpis');
+                document.getElementById('kpi-active-sos').innerText = kpis.active_sos;
+                document.getElementById('kpi-critical-areas').innerText = kpis.critical_areas;
+                document.getElementById('kpi-active-missions').innerText = kpis.active_missions;
+                document.getElementById('kpi-resources-deployed').innerText = kpis.resources_deployed;
+                document.getElementById('kpi-avg-response').innerText = `${kpis.avg_response_time_minutes}m`;
+
+                // 2. Fetch areas
+                areasList = await api.request('/api/gov/areas');
+                const areaReportSel = document.getElementById('report-area-select');
+                const areaAlertSel = document.getElementById('alert-area');
+                const simAreaSel = document.getElementById('sim-area-select');
+                
+                areaReportSel.innerHTML = '<option value="">City-Wide Briefing Summary</option>';
+                areaAlertSel.innerHTML = '<option value="">City-Wide (All Zones)</option>';
+                simAreaSel.innerHTML = '<option value="">Select target sector...</option>';
+                
+                areasList.sort((a,b) => a.area_name.localeCompare(b.area_name));
+                areasList.forEach(a => {
+                    const opt = document.createElement('option');
+                    opt.value = a.id;
+                    opt.innerText = `${a.area_name} (${a.zone})`;
+                    areaReportSel.appendChild(opt.cloneNode(true));
+                    areaAlertSel.appendChild(opt.cloneNode(true));
+                    simAreaSel.appendChild(opt);
+                });
+                
+                // 3. Fetch NGOs
+                ngosList = await api.request('/api/gov/ngos');
+                
+                // 4. Fetch SOS Queue
+                const sosQueue = await api.request('/api/gov/sos');
+                sosItems = sosQueue; // store globally for tickers
+                renderSosQueue(sosQueue);
+                
+                // 5. Fetch PDF list
+                await refreshReportHistory();
+                
+                // Fetch maps locations
+                const shelters = await api.request('/api/citizen/shelters');
+                const hospitals = await api.request('/api/citizen/hospitals');
+                updateShelterMarkers(shelters);
+                updateHospitalMarkers(hospitals);
+                
+                // Re-render heatmap if layer toggle is currently checked
+                if (document.getElementById('layer-heatmap').checked) {
+                    toggleHeatmapLayer(true);
+                }
+                
+                // Collect and render active NGO squads markers
+                let allActiveTeams = [];
+                for (let ngo of ngosList) {
+                    try {
+                        const teams = await api.request(`/api/ngo/teams`, {
+                            headers: { 'Authorization': `Bearer ${api.getToken()}` }
+                        });
+                        allActiveTeams.push(...teams);
+                    } catch(e) {}
+                }
+                updateTeamMarkers(allActiveTeams);
+                
+            } catch (e) {
+                console.error("Dashboard refresh failed:", e);
+            }
+        }
+
+        // Local live SLA timers updater
+        function updateSLATimersOnScreen() {
+            sosItems.forEach(sos => {
+                const elapsedSpan = document.getElementById(`sla-timer-${sos.id}`);
+                if (!elapsedSpan) return;
+                
+                const createdTime = new Date(sos.created_at);
+                const diffMs = Date.now() - createdTime.getTime();
+                const diffMin = Math.floor(diffMs / 60000);
+                
+                elapsedSpan.innerText = `${diffMin}m elapsed`;
+                
+                // Shift severity badges based on time
+                const container = elapsedSpan.parentElement;
+                if (diffMin >= 30) {
+                    elapsedSpan.className = "sla-timer sla-red";
+                    container.style.borderLeftColor = "var(--color-critical)";
+                } else if (diffMin >= 15) {
+                    elapsedSpan.className = "sla-timer sla-amber";
+                    container.style.borderLeftColor = "var(--color-high)";
+                }
+            });
+        }
+
+        function renderSosQueue(sosQueue) {
+            const container = document.getElementById('gov-sos-queue');
+            container.innerHTML = '';
+            
+            if (sosQueue.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; color: var(--text-muted); padding: 30px;">
+                        <i class="fa-solid fa-circle-check" style="font-size: 24px; color: var(--color-low); margin-bottom: 8px;"></i>
+                        <p>No active emergencies pending.</p>
+                    </div>
+                `;
+                updateSOSMarkers([]);
+                return;
+            }
+            
+            updateSOSMarkers(sosQueue);
+            
+            sosQueue.forEach(sos => {
+                // Determine styling based on priority
+                const priorityColor = sos.priority_score > 30 ? 'priority-critical' : sos.priority_score > 15 ? 'priority-high' : '';
+                const priorityBadgeColor = sos.priority_score > 30 ? 'var(--color-critical)' : sos.priority_score > 15 ? 'var(--color-high)' : 'var(--color-primary)';
+                
+                const createdTime = new Date(sos.created_at);
+                const diffMin = Math.floor((Date.now() - createdTime.getTime()) / 60000);
+                
+                let slaClass = "sla-timer";
+                if (diffMin >= 30) slaClass = "sla-timer sla-red";
+                else if (diffMin >= 15) slaClass = "sla-timer sla-amber";
+
+                let assignmentHtml = '';
+                if (sos.status === 'pending') {
+                    let dropdownOptions = '<option value="">Select NGO...</option>';
+                    ngosList.forEach(ngo => {
+                        if (ngo.verified) {
+                            dropdownOptions += `<option value="${ngo.id}">${ngo.org_name}</option>`;
+                        }
+                    });
+                    assignmentHtml = `
+                        <div class="form-group" style="margin-top: 10px; margin-bottom: 0; display:flex; gap: 8px;">
+                            <select class="form-control" style="padding: 6px; font-size:11px;" id="assign-ngo-${sos.id}">
+                                ${dropdownOptions}
+                            </select>
+                            <button class="btn btn-primary" onclick="assignSosToNgo(${sos.id}, event)" style="width: auto; padding: 6px 12px; font-size:11px;">
+                                Dispatch
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    assignmentHtml = `
+                        <div style="margin-top: 10px; font-size: 11px; color: var(--text-secondary); display:flex; align-items:center; gap:6px;">
+                            <i class="fa-solid fa-truck-pickup"></i> Status: <b style="color: var(--color-primary-light);">${sos.status.toUpperCase()}</b>
+                        </div>
+                    `;
+                }
+                
+                const card = document.createElement('div');
+                card.id = `sos-card-wrapper-${sos.id}`;
+                card.className = `glass-panel sos-card ${priorityColor}`;
+                card.style.cursor = 'pointer';
+                card.innerHTML = `
+                    <div class="sos-header" onclick="zoomToCoordinate(${sos.latitude}, ${sos.longitude})">
+                        <span class="sos-type"><i class="fa-solid fa-triangle-exclamation"></i> ${sos.emergency_type}</span>
+                        <span class="sos-badge" style="background: ${priorityBadgeColor}15; color: ${priorityBadgeColor};">Score: ${sos.priority_score}</span>
+                    </div>
+                    <div onclick="zoomToCoordinate(${sos.latitude}, ${sos.longitude})">
+                        <div class="sos-details">
+                            <b>Location:</b> ${sos.area_name}<br/>
+                            <b>Victims:</b> ${sos.people_affected} Trapped | <b>Medical:</b> ${sos.medical_needs || 'None'}
+                        </div>
+                        <span class="${slaClass}" id="sla-timer-${sos.id}" style="margin-top: 4px;">${diffMin}m elapsed</span>
+                        <div style="font-size: 11px; color: var(--text-muted); border-top: 1px solid var(--border-color); padding-top: 4px; margin-top: 4px;">
+                            "${sos.description || 'No comment provided.'}"
+                        </div>
+                    </div>
+                    ${assignmentHtml}
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function zoomToCoordinate(lat, lng) {
+            if (map) {
+                map.setView([lat, lng], 14.5);
+            }
+        }
+
+        async function assignSosToNgo(sosId, event) {
+            event.stopPropagation();
+            const ngoId = document.getElementById(`assign-ngo-${sosId}`).value;
+            if (!ngoId) {
+                alert("Please select an NGO.");
+                return;
+            }
+            try {
+                await api.request(`/api/gov/sos/${sosId}/assign`, {
+                    method: 'POST',
+                    body: JSON.stringify({ ngo_id: parseInt(ngoId) })
+                });
+                await refreshDashboardData();
+                await refreshAuditLogs();
+            } catch (e) {
+                alert("Dispatch failed: " + e.message);
+            }
+        }
+
+        async function generateReport() {
+            const areaId = document.getElementById('report-area-select').value;
+            const btn = document.getElementById('btn-gen-report');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Compiling...';
+            
+            try {
+                const res = await api.request('/api/gov/reports/generate', {
+                    method: 'POST',
+                    body: JSON.stringify({ area_id: areaId ? parseInt(areaId) : null })
+                });
+                await refreshReportHistory();
+                await refreshAuditLogs();
+                window.open(res.report_url, '_blank');
+            } catch (e) {
+                alert("Failed: " + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-gears"></i> Compile Government Briefing';
+            }
+        }
+
+        async function refreshReportHistory() {
+            try {
+                const reports = await api.request('/api/gov/reports');
+                const historyDiv = document.getElementById('pdf-report-history');
+                historyDiv.innerHTML = '';
+                
+                if (reports.length === 0) {
+                    historyDiv.innerHTML = '<p style="font-size:10px; color:var(--text-muted);">No reports compiled.</p>';
+                    return;
+                }
+                
+                reports.slice(0, 4).forEach(r => {
+                    const date = new Date(r.generated_at).toLocaleDateString('en-IN', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
+                    const div = document.createElement('div');
+                    div.style.display = 'flex';
+                    div.style.justify = 'space-between';
+                    div.style.alignItems = 'center';
+                    div.style.padding = '4px 0';
+                    div.style.borderBottom = '1px solid var(--border-color)';
+                    div.style.fontSize = '10px';
+                    
+                    div.innerHTML = `
+                        <div>
+                            <i class="fa-solid fa-file-pdf" style="color:var(--color-critical); margin-right:4px;"></i>
+                            <b>${r.report_type.replace('_', ' ').toUpperCase()}</b> - ${r.area_name}<br/>
+                            <span style="color:var(--text-muted); font-size:9px;">${date}</span>
+                        </div>
+                        <a href="${r.file_path}" target="_blank" class="user-badge" style="text-decoration:none; padding: 1px 6px; font-weight:700;">Open</a>
+                    `;
+                    historyDiv.appendChild(div);
+                });
+            } catch(e) {}
+        }
+
+        async function sendAiMessage() {
+            const input = document.getElementById('ai-chat-input');
+            const question = input.value.trim();
+            if (!question) return;
+            
+            input.value = '';
+            const history = document.getElementById('ai-chat-history');
+            
+            const uBubble = document.createElement('div');
+            uBubble.className = 'chat-bubble user';
+            uBubble.innerText = question;
+            history.appendChild(uBubble);
+            history.scrollTop = history.scrollHeight;
+            
+            const aiBubble = document.createElement('div');
+            aiBubble.className = 'chat-bubble ai';
+            aiBubble.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analysing...';
+            history.appendChild(aiBubble);
+            history.scrollTop = history.scrollHeight;
+            
+            try {
+                const res = await api.request('/api/gov/ai/ask', {
+                    method: 'POST',
+                    body: JSON.stringify({ question })
+                });
+                aiBubble.innerHTML = res.answer.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br/>');
+            } catch (e) {
+                aiBubble.innerText = "Fail: " + e.message;
+            }
+            history.scrollTop = history.scrollHeight;
+        }
+
+        function openAlertModal() {
+            document.getElementById('alert-modal').style.display = 'flex';
+        }
+        function closeAlertModal() {
+            document.getElementById('alert-modal').style.display = 'none';
+        }
+
+        async function handlePublishAlert(e) {
+            e.preventDefault();
+            const title = document.getElementById('alert-title').value;
+            const description = document.getElementById('alert-desc').value;
+            const disaster_type = document.getElementById('alert-type').value;
+            const severity = document.getElementById('alert-severity').value;
+            const area_id = document.getElementById('alert-area').value;
+            const expires_in_hours = document.getElementById('alert-expiry').value;
+            
+            try {
+                await api.request('/api/gov/alerts', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        title, description, disaster_type, severity,
+                        area_id: area_id ? parseInt(area_id) : null,
+                        expires_in_hours: parseInt(expires_in_hours)
+                    })
+                });
+                closeAlertModal();
+                alert("Alert successfully broadcasted.");
+                await refreshDashboardData();
+                await refreshAuditLogs();
+            } catch (e) {
+                alert("Failed: " + e.message);
+            }
+        }
+
+        // V4 Climatic Weather Report Analysis Execution
+        async function runWeatherAnalysis() {
+            const btn = document.getElementById('btn-weather-report');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analyzing Weather...';
+            
+            const history = document.getElementById('ai-chat-history');
+            const aiBubble = document.createElement('div');
+            aiBubble.className = 'chat-bubble ai';
+            aiBubble.innerHTML = '<i class="fa-solid fa-cloud-bolt fa-spin" style="color:var(--color-info);"></i> Running climatic conditions scan across 426 areas...';
+            history.appendChild(aiBubble);
+            history.scrollTop = history.scrollHeight;
+
+            try {
+                const res = await api.request('/api/gov/ai/weather-report', { method: 'POST' });
+                
+                // Show analysis paragraph in AI Assistant chat window
+                aiBubble.innerHTML = `
+                    <div style="font-weight:700; margin-bottom: 6px;"><i class="fa-solid fa-robot"></i> AI Climate Report Scan Complete</div>
+                    <p style="margin-bottom: 8px; line-height: 1.45;">${res.summary}</p>
+                    <a href="/api/gov/ai/weather-report/${res.report_id}/pdf" target="_blank" class="btn btn-primary" style="display:inline-flex; width:auto; font-size:11px; padding:6px 12px; gap:6px; font-weight:700; background:var(--color-info); border-color:var(--color-info);">
+                        <i class="fa-solid fa-file-pdf"></i> Download Weather PDF Report
+                    </a>
+                `;
+                
+                await refreshReportHistory();
+                await refreshAuditLogs();
+            } catch (e) {
+                aiBubble.innerText = "Climatic analysis failed: " + e.message;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Generate Climatic Analysis';
+                history.scrollTop = history.scrollHeight;
+            }
+        }
+
+        // V4 Test Mode Simulator controls
+        function toggleTestMode(checked) {
+            isTestModeActive = checked;
+            const badge = document.getElementById('test-mode-badge');
+            const panel = document.getElementById('dev-sim-panel');
+            const statusText = document.getElementById('sim-status-badge');
+            
+            if (checked) {
+                badge.style.display = 'inline-block';
+                panel.style.opacity = '1';
+                panel.style.pointerEvents = 'auto';
+                statusText.innerText = 'SIMULATION ACTIVE';
+                statusText.style.background = 'rgba(194,43,43,0.1)';
+                statusText.style.color = 'var(--color-critical)';
+            } else {
+                badge.style.display = 'none';
+                panel.style.opacity = '0.5';
+                panel.style.pointerEvents = 'none';
+                statusText.innerText = 'STANDBY';
+                statusText.style.background = '#E2E8F0';
+                statusText.style.color = 'var(--text-secondary)';
+            }
+        }
+
+        async function simulateSosRequest() {
+            const areaId = document.getElementById('sim-area-select').value;
+            const type = document.getElementById('sim-type-select').value;
+            const btn = document.getElementById('btn-sim-sos');
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Spawning SOS...';
+            
+            try {
+                const res = await api.request('/api/gov/test/simulate-sos', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        area_id: areaId ? parseInt(areaId) : null,
+                        emergency_type: type
+                    })
+                });
+                
+                // Add simulated marker on map & zoom
+                if (map) {
+                    map.setView([res.latitude, res.longitude], 14);
+                }
+                
+                await refreshDashboardData();
+                await refreshAuditLogs();
+            } catch(e) {
+                alert("Simulation failed: " + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-circle-radiation"></i> Trigger Simulated SOS';
+            }
+        }
+
+        async function seedTestData() {
+            try {
+                const res = await api.request('/api/gov/test/seed', { method: 'POST' });
+                alert(`Test Environment Seeded: Created ${res.seeded_sos_count} SOS and ${res.seeded_alert_count} alerts successfully!`);
+                await refreshDashboardData();
+                await refreshAuditLogs();
+            } catch(e) {
+                alert("Seeding failed: " + e.message);
+            }
+        }
+
+        async function purgeTestData() {
+            try {
+                const res = await api.request('/api/gov/test/purge', { method: 'POST' });
+                alert(`Test Purge Complete: Purged ${res.deleted_sos_count} SOS requests and ${res.deleted_alert_count} alerts from database.`);
+                await refreshDashboardData();
+                await refreshAuditLogs();
+            } catch(e) {
+                alert("Purge failed: " + e.message);
+            }
+        }
+
+        function setupWebSockets() {
+            socket = io('/');
+            
+            socket.on('connect', () => {
+                console.log("WS Connected");
+                document.getElementById('ws-status-text').innerText = 'Connected';
+                document.getElementById('ws-status-icon').style.color = 'var(--color-low)';
+                socket.emit('join_room', { room: 'government' });
+            });
+            
+            socket.on('new_sos_request', (sos) => {
+                wsEventCount++;
+                document.getElementById('ws-event-count').innerText = wsEventCount;
+                document.getElementById('ws-last-event').innerText = 'new_sos_request';
+                
+                try {
+                    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-84.wav');
+                    audio.play();
+                } catch(e) {}
+                refreshDashboardData();
+                refreshAuditLogs();
+            });
+            
+            socket.on('sos_status_changed', (update) => {
+                wsEventCount++;
+                document.getElementById('ws-event-count').innerText = wsEventCount;
+                document.getElementById('ws-last-event').innerText = 'sos_status_changed';
+                refreshDashboardData();
+                refreshAuditLogs();
+            });
+            
+            socket.on('team_location_update', (team) => {
+                wsEventCount++;
+                document.getElementById('ws-event-count').innerText = wsEventCount;
+                document.getElementById('ws-last-event').innerText = 'team_location_update';
+                
+                if (activeTeamMarkers[team.id]) {
+                    activeTeamMarkers[team.id].setLatLng([team.current_lat, team.current_lng]);
+                } else {
+                    refreshDashboardData();
+                }
+            });
+            
+            socket.on('disconnect', () => {
+                console.log("WS Disconnected");
+                document.getElementById('ws-status-text').innerText = 'Disconnected';
+                document.getElementById('ws-status-icon').style.color = 'var(--color-critical)';
+            });
+        }
+    </script>
+    
+    <!-- Floating WebSockets connection panel -->
+    <div id="live-connection-panel" style="position: fixed; bottom: 15px; right: 15px; background: rgba(15, 30, 58, 0.95); backdrop-filter: blur(8px); border: 1.5px solid var(--bg-header-light); color: white; padding: 12px 18px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); font-size: 11px; z-index: 9999; display: flex; flex-direction: column; gap: 4px; min-width: 180px;">
+        <div style="font-weight: 800; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px; display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; letter-spacing: 0.05em;">
+            <span><i class="fa-solid fa-signal" style="color:var(--color-low);" id="ws-status-icon"></i> Real-Time Engine</span>
+            <span style="font-size: 9px; padding: 1px 4px; border-radius: 3px; background: rgba(255,255,255,0.15);" id="ws-status-text">Connected</span>
+        </div>
+        <div><b>Last Event:</b> <span id="ws-last-event" style="color:var(--color-medium); font-weight:700;">None</span></div>
+        <div><b>Message Count:</b> <span id="ws-event-count" style="font-weight:700;">0</span></div>
+    </div>
+</body>
+</html>

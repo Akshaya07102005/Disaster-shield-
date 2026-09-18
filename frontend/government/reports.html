@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reports & Briefings — Government Portal</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header class="app-navbar"></header>
+    
+    <div class="portal-layout">
+        <aside class="sidebar"></aside>
+        
+        <main class="portal-content">
+            <div style="margin-bottom: 20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                <div>
+                    <h2 style="font-size: 24px; font-weight: 800;">Command Briefing Compiler</h2>
+                    <p style="color: var(--text-secondary); font-size: 13px;">Generate and compile official PDF briefings and emergency telemetry reports.</p>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <select class="form-control" id="report-area-select" style="width:180px; padding:6px; font-size:12px;">
+                        <option value="">City-Wide Summary</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="compileNewReport()" id="btn-compile" style="width:auto; font-weight:700;">
+                        <i class="fa-solid fa-file-pdf"></i> Compile PDF Briefing
+                    </button>
+                </div>
+            </div>
+
+            <!-- List of reports -->
+            <div class="glass-panel" style="padding: 20px;">
+                <h3 style="font-size: 15px; margin-bottom: 12px; font-weight: 700; border-bottom: 1.5px solid var(--border-color); padding-bottom: 8px;">
+                    <i class="fa-solid fa-folder-open" style="color: var(--color-primary-light);"></i> Archives of Generated Bulletins
+                </h3>
+                <div id="reports-table-container">
+                    <div style="text-align: center; color: var(--text-muted); padding: 40px;">
+                        <i class="fa-solid fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 10px;"></i>
+                        <p>Loading briefings index...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'gov') {
+                window.location.href = '/login.html?role=gov';
+                return;
+            }
+            
+            components.renderNavbar("Briefing Compiler");
+            components.renderSidebar("/government/reports.html");
+            
+            await loadAreas();
+            await loadReportsList();
+        });
+
+        async function loadAreas() {
+            try {
+                const list = await api.request('/api/public/areas');
+                const sel = document.getElementById('report-area-select');
+                list.forEach(a => {
+                    const opt = document.createElement('option');
+                    opt.value = a.id;
+                    opt.innerText = a.area_name;
+                    sel.appendChild(opt);
+                });
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        async function loadReportsList() {
+            try {
+                const list = await api.request('/api/gov/reports');
+                
+                const cols = [
+                    { title: "ID", field: "id", render: (val) => `<b>#${val}</b>` },
+                    { title: "File Name", field: "filename", render: (val) => `<span style="font-weight:700;">${val}</span>` },
+                    { title: "Target Region", field: "area_name", render: (val) => val || 'City-Wide Summary' },
+                    { title: "Compiled By", field: "generated_by_name" },
+                    { title: "Generation Timestamp", field: "generated_at", render: (val) => new Date(val).toLocaleString('en-IN') },
+                    { title: "Action", field: "filepath", render: (val) => {
+                        return `<a href="${val}" target="_blank" class="btn btn-secondary" style="padding: 4px 8px; font-size:11px; width:auto; border-radius:4px;"><i class="fa-solid fa-download"></i> Open PDF</a>`;
+                    }}
+                ];
+                
+                components.renderDataTable('reports-table-container', cols, list);
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        async function compileNewReport() {
+            const btn = document.getElementById('btn-compile');
+            const areaId = document.getElementById('report-area-select').value;
+            
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Compiling...`;
+            
+            const payload = {};
+            if (areaId) payload.area_id = parseInt(areaId);
+            
+            try {
+                const res = await api.request('/api/gov/reports/generate', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                alert("Briefing bulletin PDF successfully generated!");
+                await loadReportsList();
+            } catch(e) {
+                alert(`Compilation failed: ${e.message}`);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fa-solid fa-file-pdf"></i> Compile PDF Briefing`;
+            }
+        }
+    </script>
+</body>
+</html>

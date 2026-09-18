@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shelter Operations — NGO Portal</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header class="app-navbar"></header>
+    
+    <div class="portal-layout">
+        <aside class="sidebar"></aside>
+        
+        <main class="portal-content">
+            <div style="margin-bottom: 20px;">
+                <h2 style="font-size: 24px; font-weight: 800;">Shelter Operations & Utilization</h2>
+                <p style="color: var(--text-secondary); font-size: 13px;">Monitor shelter occupancy rates, safe haven locations, and remaining bed spaces.</p>
+            </div>
+
+            <!-- Stats grid -->
+            <div class="shared-grid" style="margin-bottom: 24px;">
+                <div class="glass-panel" style="border-top: 4px solid var(--color-info);">
+                    <div style="font-size: 11px; color: var(--text-secondary); font-weight:700; text-transform:uppercase;">Total Shelter Capacity</div>
+                    <div style="font-size: 28px; font-weight: 800; margin: 4px 0;" id="kpi-total-capacity">0 Beds</div>
+                </div>
+                <div class="glass-panel" style="border-top: 4px solid var(--color-medium);">
+                    <div style="font-size: 11px; color: var(--text-secondary); font-weight:700; text-transform:uppercase;">Active Occupancy</div>
+                    <div style="font-size: 28px; font-weight: 800; margin: 4px 0;" id="kpi-total-occupancy">0 Beds</div>
+                </div>
+                <div class="glass-panel" style="border-top: 4px solid var(--color-low);">
+                    <div style="font-size: 11px; color: var(--text-secondary); font-weight:700; text-transform:uppercase;">Remaining Vacancies</div>
+                    <div style="font-size: 28px; font-weight: 800; margin: 4px 0;" id="kpi-remaining-beds">0 Beds</div>
+                </div>
+            </div>
+
+            <div class="glass-panel" style="padding: 20px;">
+                <h3 style="font-size: 15px; margin-bottom: 12px; font-weight: 700; border-bottom: 1.5px solid var(--border-color); padding-bottom: 8px;">
+                    <i class="fa-solid fa-house-circle-check" style="color: var(--color-primary-light);"></i> Safe Havens Capacity Meter
+                </h3>
+                <div id="shelters-table-container">
+                    <div style="text-align: center; color: var(--text-muted); padding: 40px;">Loading shelters database...</div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'ngo') {
+                window.location.href = '/login.html?role=ngo';
+                return;
+            }
+            
+            components.renderNavbar("Shelter Operations");
+            components.renderSidebar("/ngo/shelter-analysis.html");
+            
+            await loadShelterAnalysis();
+        });
+
+        async function loadShelterAnalysis() {
+            try {
+                const data = await api.request('/api/ngo/analysis/shelters');
+                
+                document.getElementById('kpi-total-capacity').innerText = `${data.total_capacity} Beds`;
+                document.getElementById('kpi-total-occupancy').innerText = `${data.total_occupancy} Beds`;
+                document.getElementById('kpi-remaining-beds').innerText = `${data.remaining_capacity} Beds`;
+                
+                const cols = [
+                    { title: "ID", field: "id", render: (val) => `<b>#${val}</b>` },
+                    { title: "Shelter Name", field: "name", render: (val) => `<strong>${val}</strong>` },
+                    { title: "Sector Region", field: "area_name" },
+                    { title: "Capacity", field: "capacity" },
+                    { title: "Occupancy", field: "current_occupancy" },
+                    { title: "Hotline Contact", field: "contact", render: (val) => val || 'N/A' },
+                    { title: "Status Gauge", field: "capacity", render: (val, row) => {
+                        const pct = ((row.current_occupancy / val) * 100).toFixed(0);
+                        let barColor = 'var(--color-low)';
+                        if (pct >= 90) barColor = 'var(--color-critical)';
+                        else if (pct >= 70) barColor = 'var(--color-high)';
+                        else if (pct >= 40) barColor = 'var(--color-medium)';
+                        
+                        return `
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <div style="background:#E2E8F0; height:8px; border-radius:4px; flex:1; width:85px;">
+                                    <div style="background:${barColor}; height:100%; width:${pct}%; border-radius:4px;"></div>
+                                </div>
+                                <span style="font-size:11px; font-weight:700; width:30px;">${pct}%</span>
+                            </div>
+                        `;
+                    }}
+                ];
+                
+                components.renderDataTable('shelters-table-container', cols, data.shelters);
+            } catch(e) {
+                console.error(e);
+            }
+        }
+    </script>
+</body>
+</html>

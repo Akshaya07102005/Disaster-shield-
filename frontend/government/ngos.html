@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NGO Verification — Government Portal</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header class="app-navbar"></header>
+    
+    <div class="portal-layout">
+        <aside class="sidebar"></aside>
+        
+        <main class="portal-content">
+            <div style="margin-bottom: 20px;">
+                <h2 style="font-size: 24px; font-weight: 800;">NGO Verification Hub</h2>
+                <p style="color: var(--text-secondary); font-size: 13px;">Manage registered civil society/NGO profiles and toggle official operational clearances.</p>
+            </div>
+
+            <div class="glass-panel" style="padding: 20px;">
+                <div id="ngos-table-container">
+                    <div style="text-align: center; color: var(--text-muted); padding: 40px;">
+                        <i class="fa-solid fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 10px;"></i>
+                        <p>Loading NGOs registry...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'gov') {
+                window.location.href = '/login.html?role=gov';
+                return;
+            }
+            
+            components.renderNavbar("NGO Operations Hub");
+            components.renderSidebar("/government/ngos.html");
+            
+            await loadNGORegistry();
+        });
+
+        async function loadNGORegistry() {
+            try {
+                const list = await api.request('/api/gov/ngos');
+                
+                const cols = [
+                    { title: "ID", field: "id", render: (val) => `<b>#${val}</b>` },
+                    { title: "Organization Name", field: "org_name", render: (val) => `<strong>${val}</strong>` },
+                    { title: "Capacity Level", field: "capacity", render: (val) => `${val} volunteers` },
+                    { title: "Assigned Area", field: "location" },
+                    { title: "Credentials / Status", field: "verified", render: (val) => {
+                        if (val) {
+                            return `<span class="user-badge role-citizen"><i class="fa-solid fa-circle-check"></i> VERIFIED</span>`;
+                        }
+                        return `<span class="user-badge role-gov"><i class="fa-solid fa-circle-notch fa-spin"></i> PENDING APPROVAL</span>`;
+                    }},
+                    { title: "Clearance Action", field: "id", render: (val, row) => {
+                        if (!row.verified) {
+                            return `<button class="btn btn-success" onclick="verifyNgo(${val})" style="padding: 4px 8px; font-size:11px; width:auto; border-radius:4px;"><i class="fa-solid fa-check"></i> Grant Verification</button>`;
+                        }
+                        return `<span style="font-size:11px; color:var(--text-muted); font-style:italic;">Clearance Active</span>`;
+                    }}
+                ];
+                
+                components.renderDataTable('ngos-table-container', cols, list);
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        async function verifyNgo(ngoId) {
+            if (!confirm("Are you sure you want to grant official disaster-response clearance to this NGO?")) return;
+            
+            try {
+                await api.request(`/api/gov/ngos/${ngoId}/verify`, { method: 'POST' });
+                alert("NGO clearance granted!");
+                await loadNGORegistry();
+            } catch(e) {
+                alert(`Verification failed: ${e.message}`);
+            }
+        }
+    </script>
+</body>
+</html>

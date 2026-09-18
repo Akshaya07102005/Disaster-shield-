@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Operations Map — NGO Portal</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Leaflet.js -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+    <header class="app-navbar"></header>
+    
+    <div class="portal-layout">
+        <aside class="sidebar"></aside>
+        
+        <main class="portal-content" style="padding:0; position:relative; height:calc(100vh - 65px);">
+            <!-- Map Layers Toggles Overlay -->
+            <div class="map-overlay-controls" style="background: white; border: 1px solid var(--border-color); box-shadow: var(--shadow-md);">
+                <h4 style="font-size: 11px; margin-bottom: 8px; border-bottom: 1.5px solid var(--border-color); padding-bottom: 4px; color: var(--color-primary); font-weight:700;">MAP LAYERS</h4>
+                <label class="control-item" style="display:flex; align-items:center; gap:6px; font-size:12px; margin-bottom:6px;">
+                    <input type="checkbox" id="layer-mission" checked onchange="toggleNgoLayer('mission', this.checked)"> Assigned Missions
+                </label>
+                <label class="control-item" style="display:flex; align-items:center; gap:6px; font-size:12px; margin-bottom:6px;">
+                    <input type="checkbox" id="layer-shelters" checked onchange="toggleNgoLayer('shelters', this.checked)"> Relief Shelters
+                </label>
+                <label class="control-item" style="display:flex; align-items:center; gap:6px; font-size:12px; margin-bottom:6px;">
+                    <input type="checkbox" id="layer-hospitals" checked onchange="toggleNgoLayer('hospitals', this.checked)"> Wards & Hospitals
+                </label>
+                <div class="user-badge" style="background: rgba(220, 38, 38, 0.1); color: var(--color-critical); border-color: var(--color-critical); font-size: 9px; font-weight: 800; display: block; margin-top: 10px; text-align:center;">
+                    DEMO SIMULATION active
+                </div>
+            </div>
+
+            <div id="map" style="height: 100%; width:100%;"></div>
+        </main>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script src="/js/map.js"></script>
+    <script>
+        let mapInstance;
+        let missionIdParam = null;
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'ngo') {
+                window.location.href = '/login.html?role=ngo';
+                return;
+            }
+            
+            components.renderNavbar("NGO Map");
+            components.renderSidebar("/ngo/map.html");
+            
+            const params = new URLSearchParams(window.location.search);
+            missionIdParam = params.get('mission_id');
+            
+            mapInstance = initMap('map');
+            
+            await loadMapLayers();
+        });
+
+        async function loadMapLayers() {
+            try {
+                // 1. Fetch NGO missions
+                const missions = await api.request('/api/ngo/missions');
+                updateSOSMarkers(missions.map(m => m.sos_details));
+                
+                // 2. Fetch shelters
+                const shelters = await api.request('/api/citizen/shelters');
+                updateShelterMarkers(shelters);
+                
+                // 3. Fetch hospitals
+                const hospitals = await api.request('/api/citizen/hospitals');
+                updateHospitalMarkers(hospitals);
+                
+                // If mission specified, draw path
+                if (missionIdParam) {
+                    const route = await api.request(`/api/ngo/missions/${missionIdParam}/route`);
+                    const pts = route.route_trail.map(p => [p.latitude, p.longitude]);
+                    L.polyline(pts, { color: '#7C3AED', weight: 5, dashArray: '10, 10' }).addTo(mapInstance);
+                    
+                    // Fit map bounds to show route
+                    mapInstance.fitBounds(L.polyline(pts).getBounds(), { padding: [50, 50] });
+                }
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        function toggleNgoLayer(layerName, show) {
+            toggleLayer(layerName, show);
+            // Custom toggle for mission layer group
+            if (layerName === 'mission') {
+                toggleLayer('sos', show);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disaster Shield AI — Citizen Portal</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Leaflet.js -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+</head>
+<body style="min-height: 100vh; background-color: var(--bg-main);">
+    
+    <header class="app-navbar">
+        <div class="navbar-brand">
+            <i class="fa-solid fa-shield-halved" style="color: var(--color-critical);"></i>
+            <span data-trn="nav_title">DISASTER SHIELD CITIZEN PORTAL</span>
+        </div>
+        <div class="navbar-user">
+            <!-- V2 Notification center -->
+            <div class="notify-center" onclick="toggleNotificationDropdown(event)">
+                <i class="fa-solid fa-bell" style="font-size: 18px; color: white;"></i>
+                <span class="notify-badge" id="navbar-notify-count" style="display: none;">0</span>
+                <div class="notify-dropdown" id="navbar-notify-dropdown" style="display: none;">
+                    <div style="padding: 10px 14px; border-bottom: 1.5px solid var(--border-color); font-weight: 700; font-size: 13px; color: var(--color-primary); display: flex; justify-content: space-between; align-items: center;">
+                        <span data-trn="notif_header">NOTIFICATIONS</span>
+                    </div>
+                    <div id="notify-dropdown-list">
+                        <div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 12px;" data-trn="no_notifs">No active notifications.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- V2 Tamil Language Toggle -->
+            <button class="btn btn-secondary" onclick="toggleLanguage()" id="btn-lang-toggle" style="padding: 6px 12px; width: auto; font-size: 12px; font-weight:700;">
+                தமிழ்
+            </button>
+            
+            <span class="user-badge" id="citizen-user-name">Loading Citizen...</span>
+            <button class="btn btn-secondary" onclick="api.logout()" style="padding: 6px 12px; width: auto; font-size: 12px;">
+                <i class="fa-solid fa-right-from-bracket"></i>
+            </button>
+        </div>
+    </header>
+
+    <div class="citizen-container">
+
+        <!-- Offline sync alerts warning banner -->
+        <div class="offline-banner" id="offline-sync-banner">
+            <i class="fa-solid fa-triangle-exclamation"></i> 
+            <span data-trn="offline_banner">Warning: You are currently offline. SOS will be queued locally and sent automatically on reconnect.</span>
+        </div>
+        
+        <!-- Live Alerts Broadcast Box -->
+        <div class="glass-panel" id="alert-ticker" style="display: none; border-color: var(--color-critical);">
+            <h4 style="color: var(--color-critical); font-size: 13px; margin-bottom: 8px;" data-trn="broadcast_title">
+                <i class="fa-solid fa-triangle-exclamation"></i> EMERGENCY ALERTS BROADCAST
+            </h4>
+            <div id="citizen-alerts-list"></div>
+        </div>
+        
+        <!-- Main Panel: SOS Trigger -->
+        <div class="glass-panel" style="text-align: center; border-top: 5px solid var(--color-critical);">
+            <h2 style="font-size: 20px; font-weight: 800; margin-bottom: 4px;" data-trn="sos_header">EMERGENCY SOS PANIC BUTTON</h2>
+            <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 15px;" data-trn="sos_subtitle">Tapping the button below transmits your coordinates and rescue details to government command centers in real time.</p>
+            
+            <div style="display: flex; flex-direction: column; align-items: center;">
+                <button class="panic-button" id="panic-btn" onclick="triggerPanicSOS()">
+                    <i class="fa-solid fa-triangle-exclamation" style="font-size: 32px; margin-bottom: 8px;"></i>
+                    <span data-trn="panic_button_text">PANIC SOS</span>
+                </button>
+                <div id="gps-status" style="font-size: 12px; color: var(--text-secondary); margin-bottom: 15px;">
+                    <i class="fa-solid fa-location-crosshairs"></i> GPS: Acquiring Satellites...
+                </div>
+            </div>
+
+            <!-- SOS Metadata Config -->
+            <div style="text-align: left; background: #F8FAFC; padding: 16px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-color);">
+                <h4 style="font-size: 11px; margin-bottom: 12px; color: var(--text-secondary); text-transform: uppercase; font-weight:700;" data-trn="meta_header">SOS Metadata Details</h4>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="form-group">
+                        <label class="form-label" data-trn="emergency_label">Emergency Type</label>
+                        <select class="form-control" id="sos-type" style="padding: 8px; font-size: 13px;">
+                            <option value="Flood">Flood / Water Logging</option>
+                            <option value="Medical">Medical Urgent Need</option>
+                            <option value="Trapped">Trapped / Structural Risk</option>
+                            <option value="Cyclone">Storm damage</option>
+                            <option value="Other">Other hazards</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" data-trn="victims_label">People Affected</label>
+                        <input class="form-control" type="number" id="sos-victims" min="1" value="1" style="padding: 8px; font-size: 13px;">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" data-trn="medical_label">Medical Needs (Critical)</label>
+                    <input class="form-control" type="text" id="sos-med-needs" placeholder="E.g., Elderly heart patient, severe bleeding, asthma..." style="padding: 8px; font-size: 13px;">
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" data-trn="desc_label">Situation Description</label>
+                    <textarea class="form-control" id="sos-desc" rows="2" placeholder="First floor flooding, roof level reached, power cut..." style="padding: 8px; font-size: 13px;"></textarea>
+                </div>
+            </div>
+            
+            <div id="sos-success-alert" style="display: none; margin-top: 15px; padding: 12px; border-radius: var(--radius-sm); background: rgba(31, 138, 112, 0.1); border: 1.5px solid var(--color-success); color: var(--color-success); font-size: 13px; text-align:left;">
+                <!-- Confirms submission -->
+            </div>
+        </div>
+
+        <!-- V2 Family Group Safety Grid -->
+        <div class="glass-panel">
+            <h3 style="margin-bottom: 12px; font-size: 16px; display: flex; justify-content: space-between; align-items: center;">
+                <span data-trn="family_title"><i class="fa-solid fa-people-roof" style="color: var(--color-primary-light);"></i> Family Group Check-in</span>
+                <button class="btn btn-secondary" onclick="openFamilyModal()" style="width:auto; padding:4px 8px; font-size:10px;" data-trn="add_member_btn">+ Add Member</button>
+            </h3>
+            
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;" id="family-members-grid">
+                <!-- Populated dynamically -->
+            </div>
+        </div>
+
+        <!-- Live Rescue Tracking status -->
+        <div class="glass-panel" id="rescue-tracking-panel" style="display: none;">
+            <h3 style="margin-bottom: 12px; font-size: 16px; color: var(--color-primary);" data-trn="tracking_title"><i class="fa-solid fa-truck-pickup"></i> Live Rescue Operations Tracker</h3>
+            <div style="background: rgba(255,255,255,0.03); border:1px solid var(--border-color); padding: 16px; border-radius: var(--radius-sm);">
+                <div style="display:flex; justify-content:space-between; margin-bottom: 8px; font-size: 13px;">
+                    <span><b>Rescue Force:</b> <span id="track-ngo-name">Red Cross</span></span>
+                    <span class="user-badge" id="track-mission-status" style="background:rgba(59,130,246,0.15); color:#60A5FA;">EN ROUTE</span>
+                </div>
+                <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;" data-trn="tracking_text">
+                    Your SOS request has been assigned. NGO teams have been dispatched to your location. Keep your phone charged.
+                </div>
+                
+                <!-- Micro map showing team approaching citizen -->
+                <div style="height: 180px; border-radius: var(--radius-sm); overflow: hidden; margin-top: 10px;">
+                    <div id="mini-map" style="width: 100%; height: 100%;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Nearby Shelters & Hospitals Locator -->
+        <div class="glass-panel">
+            <h3 style="margin-bottom: 15px; font-size: 16px; display:flex; align-items:center; gap:8px;">
+                <i class="fa-solid fa-route" style="color: var(--color-success);"></i> <span data-trn="relief_title">Nearby Safety Relief & Medical Centers</span>
+            </h3>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                <button class="btn btn-secondary" onclick="loadReliefList('shelters')" id="btn-show-shelters" style="font-size:12px; padding: 10px;">
+                    <i class="fa-solid fa-house-shield"></i> <span data-trn="show_shelters_btn">Show Shelters</span>
+                </button>
+                <button class="btn btn-secondary" onclick="loadReliefList('hospitals')" id="btn-show-hospitals" style="font-size:12px; padding: 10px;">
+                    <i class="fa-solid fa-hospital"></i> <span data-trn="show_hospitals_btn">Show Hospitals</span>
+                </button>
+            </div>
+            
+            <div id="relief-list-container" style="display: flex; flex-direction: column; gap: 10px; max-height: 250px; overflow-y: auto;">
+                <p style="text-align: center; font-size: 12px; color: var(--text-secondary);" data-trn="relief_helper">Select shelter or hospital view sorted by GPS proximity.</p>
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- Add Family Member Modal -->
+    <div id="family-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); z-index: 10000; align-items: center; justify-content: center; padding: 20px;">
+        <div class="glass-panel" style="width: 100%; max-width: 400px; padding: 24px;">
+            <h3 style="margin-bottom: 15px;" data-trn="add_member_header">Add Family Member</h3>
+            <form onsubmit="handleAddFamilyMember(event)">
+                <div class="form-group">
+                    <label class="form-label" data-trn="member_name_label">Full Name</label>
+                    <input class="form-control" type="text" id="family-member-name" required placeholder="E.g., Anjali Nathan">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" data-trn="member_phone_label">Phone Number</label>
+                    <input class="form-control" type="text" id="family-member-phone" required placeholder="E.g., 9988112233">
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button class="btn btn-primary" type="submit" data-trn="save_btn">Save</button>
+                    <button class="btn btn-secondary" type="button" onclick="closeFamilyModal()" data-trn="cancel_btn">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script>
+        let currentLat = 12.9802; // Velachery default coords
+        let currentLng = 80.2228;
+        let activeSosId = null;
+        let miniMap;
+        let citizenMarker;
+        let teamMarkersList = [];
+        let socket;
+        let currentLanguage = 'en'; // default english
+
+        // English-Tamil UI translation mappings
+        const translations = {
+            'en': {
+                'nav_title': 'DISASTER SHIELD CITIZEN PORTAL',
+                'notif_header': 'NOTIFICATIONS',
+                'no_notifs': 'No active notifications.',
+                'sos_header': 'EMERGENCY SOS PANIC BUTTON',
+                'sos_subtitle': 'Tapping the button below transmits your coordinates and rescue details to government command centers in real time.',
+                'panic_button_text': 'PANIC SOS',
+                'meta_header': 'SOS Metadata Details',
+                'emergency_label': 'Emergency Type',
+                'victims_label': 'People Affected',
+                'medical_label': 'Medical Needs (Critical)',
+                'desc_label': 'Situation Description',
+                'family_title': 'Family Group Check-in',
+                'add_member_btn': '+ Add Member',
+                'tracking_title': 'Live Rescue Operations Tracker',
+                'tracking_text': 'Your SOS request has been assigned. NGO teams have been dispatched to your location. Keep your phone charged.',
+                'relief_title': 'Nearby Safety Relief & Medical Centers',
+                'show_shelters_btn': 'Show Shelters',
+                'show_hospitals_btn': 'Show Hospitals',
+                'relief_helper': 'Select shelter or hospital view sorted by GPS proximity.',
+                'add_member_header': 'Add Family Member',
+                'member_name_label': 'Full Name',
+                'member_phone_label': 'Phone Number',
+                'save_btn': 'Save',
+                'cancel_btn': 'Cancel',
+                'offline_banner': 'Warning: You are currently offline. SOS will be queued locally and sent automatically on reconnect.'
+            },
+            'ta': {
+                'nav_title': 'பேரிடர் பாதுகாப்பு குடிமக்கள் போர்டல்',
+                'notif_header': 'அறிவிப்புகள்',
+                'no_notifs': 'செயலில் அறிவிப்புகள் இல்லை.',
+                'sos_header': 'அவசர SOS பீதி பொத்தான்',
+                'sos_subtitle': 'கீழே உள்ள பொத்தானைத் தட்டினால், உங்கள் இருப்பிடக் குறியீடுகள் மற்றும் மீட்புத் தகவல்கள் அரசாங்கக் கட்டுப்பாட்டு மையங்களுக்கு அனுப்பப்படும்.',
+                'panic_button_text': 'பீதி SOS',
+                'meta_header': 'SOS மெட்டாடேட்டா விவரங்கள்',
+                'emergency_label': 'அவசரநிலை வகை',
+                'victims_label': 'பாதிக்கப்பட்ட மக்கள்',
+                'medical_label': 'மருத்துவ தேவைகள் (முக்கியமானவை)',
+                'desc_label': 'சூழ்நிலை விளக்கம்',
+                'family_title': 'குடும்பக் குழு பாதுகாப்பு விவரம்',
+                'add_member_btn': '+ உறுப்பினரைச் சேர்',
+                'tracking_title': 'நேரடி மீட்பு நடவடிக்கைகள் கண்காணிப்பாளர்',
+                'tracking_text': 'உங்கள் SOS கோரிக்கை ஒதுக்கப்பட்டுள்ளது. என்ஜிஓ குழுக்கள் உங்கள் இருப்பிடத்திற்கு அனுப்பப்பட்டுள்ளன. உங்கள் போனை சார்ஜ் செய்து கொள்ளவும்.',
+                'relief_title': 'அருகிலுள்ள நிவாரண முகாம்கள் & மருத்துவ மையங்கள்',
+                'show_shelters_btn': 'நிவாரண முகாம்கள்',
+                'show_hospitals_btn': 'மருத்துவமனைகள்',
+                'relief_helper': 'ஜிபிஎஸ் தூரத்தின்படி வரிசைப்படுத்தப்பட்ட முகாம் அல்லது மருத்துவமனை பட்டியலைத் தேர்ந்தெடுக்கவும்.',
+                'add_member_header': 'குடும்ப உறுப்பினரைச் சேர்',
+                'member_name_label': 'முழு பெயர்',
+                'member_phone_label': 'தொலைபேசி எண்',
+                'save_btn': 'சேமி',
+                'cancel_btn': 'ரத்து செய்',
+                'offline_banner': 'எச்சரிக்கை: நீங்கள் தற்போது ஆஃப்லைனில் உள்ளீர்கள். உங்கள் SOS கோரிக்கை உள்ளூரிலேயே சேமிக்கப்பட்டு இணையம் கிடைத்ததும் அனுப்பப்படும்.'
+            }
+        };
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'citizen') {
+                const session = await api.checkSession();
+                if (!session || session.user.role !== 'citizen') {
+                    window.location.href = '/';
+                    return;
+                }
+            }
+            
+            document.getElementById('citizen-user-name').innerText = `Citizen: ${user.name}`;
+            
+            // Register offline network connection event handlers
+            window.addEventListener('online', syncOfflineSOSQueue);
+            window.addEventListener('offline', updateOfflineBannerState);
+            updateOfflineBannerState();
+            
+            acquireGPS();
+            await loadActiveAlerts();
+            await refreshFamilyGrid();
+            await refreshNotificationBell();
+            
+            // Sync offline queue if back online on startup
+            if (navigator.onLine) {
+                await syncOfflineSOSQueue();
+            }
+            
+            setupWebSockets();
+        });
+
+        // Toggle language English / Tamil
+        function toggleLanguage() {
+            currentLanguage = currentLanguage === 'en' ? 'ta' : 'en';
+            document.getElementById('btn-lang-toggle').innerText = currentLanguage === 'en' ? 'தமிழ்' : 'English';
+            
+            // Translate tags
+            const elements = document.querySelectorAll('[data-trn]');
+            elements.forEach(el => {
+                const key = el.getAttribute('data-trn');
+                if (translations[currentLanguage][key]) {
+                    el.innerText = translations[currentLanguage][key];
+                }
+            });
+        }
+
+        // Notification bell controls
+        function toggleNotificationDropdown(e) {
+            e.stopPropagation();
+            const el = document.getElementById('navbar-notify-dropdown');
+            el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        }
+
+        document.addEventListener('click', () => {
+            document.getElementById('navbar-notify-dropdown').style.display = 'none';
+        });
+
+        async function refreshNotificationBell() {
+            try {
+                const notifs = await api.request('/api/citizen/notifications');
+                const unreadCount = notifs.filter(n => !n.read).length;
+                const countBadge = document.getElementById('navbar-notify-count');
+                
+                if (unreadCount > 0) {
+                    countBadge.innerText = unreadCount;
+                    countBadge.style.display = 'flex';
+                } else {
+                    countBadge.style.display = 'none';
+                }
+                
+                const list = document.getElementById('notify-dropdown-list');
+                list.innerHTML = '';
+                
+                if (notifs.length === 0) {
+                    list.innerHTML = `<div style="padding:15px; text-align:center; color:var(--text-muted); font-size:11px;" data-trn="no_notifs">No active notifications.</div>`;
+                    return;
+                }
+                
+                notifs.slice(0, 4).forEach(n => {
+                    const item = document.createElement('div');
+                    item.className = 'notify-item';
+                    item.style.padding = '8px 12px';
+                    item.innerHTML = `
+                        <strong>${n.title}</strong><br/>
+                        <span style="font-size:10px; color:var(--text-secondary);">${n.body}</span>
+                    `;
+                    list.appendChild(item);
+                });
+            } catch(e) {}
+        }
+
+        // Offline state monitoring UI
+        function updateOfflineBannerState() {
+            const banner = document.getElementById('offline-sync-banner');
+            if (!navigator.onLine) {
+                banner.style.display = 'block';
+            } else {
+                banner.style.display = 'none';
+            }
+        }
+
+        // Offline localStorage sync script
+        async function syncOfflineSOSQueue() {
+            updateOfflineBannerState();
+            if (!navigator.onLine) return;
+            
+            const offlineQueue = JSON.parse(localStorage.getItem('sos_offline_queue') || '[]');
+            if (offlineQueue.length === 0) return;
+            
+            try {
+                const res = await api.request('/api/citizen/sos/queue-offline', {
+                    method: 'POST',
+                    body: JSON.stringify({ soses: offlineQueue })
+                });
+                
+                // Clear queue
+                localStorage.setItem('sos_offline_queue', '[]');
+                alert(`Successfully synchronized ${res.synchronized_count} offline queued emergency SOS alerts!`);
+            } catch (e) {
+                console.error("Offline sync failed:", e);
+            }
+        }
+
+        // Family Safety check-in methods
+        function openFamilyModal() {
+            document.getElementById('family-modal').style.display = 'flex';
+        }
+        function closeFamilyModal() {
+            document.getElementById('family-modal').style.display = 'none';
+        }
+
+        async function handleAddFamilyMember(e) {
+            e.preventDefault();
+            const name = document.getElementById('family-member-name').value;
+            const phone = document.getElementById('family-member-phone').value;
+            
+            try {
+                await api.request('/api/citizen/family-group', {
+                    method: 'POST',
+                    body: JSON.stringify({ member_name: name, member_phone: phone, status: 'unknown' })
+                });
+                closeFamilyModal();
+                document.getElementById('family-member-name').value = '';
+                document.getElementById('family-member-phone').value = '';
+                await refreshFamilyGrid();
+            } catch(e) {
+                alert("Failed: " + e.message);
+            }
+        }
+
+        async function refreshFamilyGrid() {
+            try {
+                const members = await api.request('/api/citizen/family-group');
+                const grid = document.getElementById('family-members-grid');
+                grid.innerHTML = '';
+                
+                if (members.length === 0) {
+                    grid.innerHTML = '<div style="grid-column: span 2; text-align:center; padding:15px; color:var(--text-secondary); font-size:12px;">No members added.</div>';
+                    return;
+                }
+                
+                members.forEach(m => {
+                    const statusColor = m.status === 'safe' ? 'var(--color-low)' : m.status === 'needs_help' ? 'var(--color-critical)' : 'var(--text-muted)';
+                    const card = document.createElement('div');
+                    card.style.border = '1px solid var(--border-color)';
+                    card.style.background = 'white';
+                    card.style.padding = '10px';
+                    card.style.borderRadius = '8px';
+                    card.style.fontSize = '12px';
+                    card.style.display = 'flex';
+                    card.style.flexDirection = 'column';
+                    card.style.justify = 'space-between';
+                    
+                    card.innerHTML = `
+                        <div>
+                            <strong>${m.member_name}</strong><br/>
+                            <span style="font-size:10px; color:var(--text-secondary);">${m.member_phone}</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+                            <span style="color:${statusColor}; font-weight:700; font-size:10px;">${m.status.toUpperCase()}</span>
+                            <button class="btn btn-secondary" onclick="toggleFamilyMemberStatus(${m.id}, '${m.status}')" style="width:auto; padding:2px 6px; font-size:9px;">Toggle</button>
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                });
+            } catch(e) {}
+        }
+
+        async function toggleFamilyMemberStatus(memberId, currentStatus) {
+            const nextStatus = currentStatus === 'safe' ? 'needs_help' : 'safe';
+            try {
+                await api.request('/api/citizen/family-group', {
+                    method: 'PUT',
+                    body: JSON.stringify({ member_id: memberId, status: nextStatus })
+                });
+                await refreshFamilyGrid();
+            } catch(e) {}
+        }
+
+        function acquireGPS() {
+            const statusDiv = document.getElementById('gps-status');
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        currentLat = position.coords.latitude;
+                        currentLng = position.coords.longitude;
+                        statusDiv.innerHTML = `<i class="fa-solid fa-location-crosshairs" style="color:var(--color-low);"></i> GPS: Locked (${currentLat.toFixed(4)}, ${currentLng.toFixed(4)})`;
+                    },
+                    (error) => {
+                        statusDiv.innerHTML = `<i class="fa-solid fa-location-crosshairs" style="color:var(--color-medium);"></i> GPS Mocked: Velachery Hub (${currentLat}, ${currentLng})`;
+                    },
+                    { enableHighAccuracy: true, timeout: 5000 }
+                );
+            } else {
+                statusDiv.innerHTML = `<i class="fa-solid fa-location-crosshairs" style="color:var(--color-critical);"></i> Geolocation unsupported.`;
+            }
+        }
+
+        async function loadActiveAlerts() {
+            try {
+                const alerts = await api.request('/api/citizen/alerts');
+                const container = document.getElementById('citizen-alerts-list');
+                const ticker = document.getElementById('alert-ticker');
+                
+                container.innerHTML = '';
+                if (alerts.length > 0) {
+                    ticker.style.display = 'block';
+                    alerts.forEach(a => {
+                        const alertDiv = document.createElement('div');
+                        alertDiv.style.border = '1px solid var(--border-color)';
+                        alertDiv.style.borderRadius = '6px';
+                        alertDiv.style.padding = '8px 12px';
+                        alertDiv.style.marginBottom = '6px';
+                        alertDiv.style.fontSize = '12px';
+                        alertDiv.style.background = 'white';
+                        
+                        alertDiv.innerHTML = `
+                            <strong>${a.title}</strong> [${a.severity}]<br/>
+                            <span style="color:var(--text-secondary); font-size:11px;">${a.description}</span>
+                        `;
+                        container.appendChild(alertDiv);
+                    });
+                } else {
+                    ticker.style.display = 'none';
+                }
+            } catch(e) {}
+        }
+
+        async function triggerPanicSOS() {
+            const btn = document.getElementById('panic-btn');
+            btn.disabled = true;
+            btn.style.opacity = 0.6;
+            
+            const emergency_type = document.getElementById('sos-type').value;
+            const people_affected = parseInt(document.getElementById('sos-victims').value);
+            const medical_needs = document.getElementById('sos-med-needs').value;
+            const description = document.getElementById('sos-desc').value;
+            
+            const payload = {
+                latitude: currentLat,
+                longitude: currentLng,
+                emergency_type,
+                people_affected,
+                medical_needs,
+                description,
+                created_at: new Date().toISOString()
+            };
+            
+            // V2 Offline-first SOS handling
+            if (!navigator.onLine) {
+                let queue = JSON.parse(localStorage.getItem('sos_offline_queue') || '[]');
+                queue.push(payload);
+                localStorage.setItem('sos_offline_queue', JSON.stringify(queue));
+                
+                const successDiv = document.getElementById('sos-success-alert');
+                successDiv.style.background = "rgba(217, 97, 43, 0.1)";
+                successDiv.style.borderColor = "var(--color-high)";
+                successDiv.style.color = "var(--color-high)";
+                successDiv.innerHTML = `
+                    <i class="fa-solid fa-cloud-slash"></i> <b>SOS QUEUED (OFFLINE)</b><br/>
+                    Your panic alert has been saved locally and will auto-sync on reconnect. Seek high ground.
+                `;
+                successDiv.style.display = 'block';
+                btn.disabled = false;
+                btn.style.opacity = 1;
+                return;
+            }
+            
+            try {
+                const res = await api.request('/api/citizen/sos', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                
+                activeSosId = res.sos.id;
+                
+                const successDiv = document.getElementById('sos-success-alert');
+                successDiv.style.background = "rgba(31, 138, 112, 0.1)";
+                successDiv.style.borderColor = "var(--color-success)";
+                successDiv.style.color = "var(--color-success)";
+                successDiv.innerHTML = `
+                    <i class="fa-solid fa-check"></i> <b>SOS BROADCAST COMPLETE</b><br/>
+                    Priority score: <b>${res.sos.priority_score}</b>. NGO fleets dispatched. Keep calm.
+                `;
+                successDiv.style.display = 'block';
+                
+                checkRescueStatus();
+            } catch(e) {
+                alert("Failed: " + e.message);
+                btn.disabled = false;
+                btn.style.opacity = 1;
+            }
+        }
+
+        async function checkRescueStatus() {
+            if (!activeSosId) return;
+            try {
+                const data = await api.request(`/api/citizen/sos/${activeSosId}/track`);
+                
+                if (data.mission) {
+                    document.getElementById('rescue-tracking-panel').style.display = 'block';
+                    document.getElementById('track-ngo-name').innerText = data.mission.ngo_name;
+                    document.getElementById('track-mission-status').innerText = data.mission.status.toUpperCase();
+                    
+                    initMiniMap(data.sos.latitude, data.sos.longitude, data.active_rescue_teams);
+                    
+                    if (data.sos.status === 'resolved') {
+                        document.getElementById('track-mission-status').innerText = "RESOLVED";
+                        document.getElementById('track-mission-status').style.background = "rgba(31,138,112,0.15)";
+                        document.getElementById('track-mission-status').style.color = "var(--color-success)";
+                        alert("Rescue mission complete! Glad you are safe.");
+                        activeSosId = null;
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function initMiniMap(citizenLat, citizenLng, teams) {
+            if (!miniMap) {
+                miniMap = L.map('mini-map', {
+                    zoomControl: false,
+                    attributionControl: false
+                }).setView([citizenLat, citizenLng], 13);
+                
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {}).addTo(miniMap);
+                
+                const citizenIcon = L.divIcon({
+                    className: 'citizen-sos-icon',
+                    html: `<div style="width:14px; height:14px; border-radius:50%; background:var(--color-critical); border:2px solid white; box-shadow: 0 0 10px red;"></div>`,
+                    iconSize: [14, 14],
+                    iconAnchor: [7, 7]
+                });
+                citizenMarker = L.marker([citizenLat, citizenLng], { icon: citizenIcon }).addTo(miniMap);
+            }
+            
+            teamMarkersList.forEach(m => miniMap.removeLayer(m));
+            teamMarkersList = [];
+            
+            teams.forEach(team => {
+                if (team.current_lat === null || team.current_lng === null) return;
+                
+                const teamIcon = L.divIcon({
+                    className: 'team-approaching-icon',
+                    html: `
+                        <div style="display:flex; justify-content:center; align-items:center; width:26px; height:26px; border-radius:50%; background:var(--color-primary-light); border:1.5px solid white; color:white; font-size:10px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+                            <i class="fa-solid fa-truck-pickup"></i>
+                        </div>
+                    `,
+                    iconSize: [26, 26],
+                    iconAnchor: [13, 13]
+                });
+                const m = L.marker([team.current_lat, team.current_lng], { icon: teamIcon }).addTo(miniMap);
+                teamMarkersList.push(m);
+            });
+            
+            if (teamMarkersList.length > 0) {
+                const group = new L.featureGroup([citizenMarker, ...teamMarkersList]);
+                miniMap.fitBounds(group.getBounds().pad(0.15));
+            }
+        }
+
+        async function loadReliefList(type) {
+            const container = document.getElementById('relief-list-container');
+            container.innerHTML = '<div style="text-align:center; padding:10px;"><i class="fa-solid fa-circle-notch fa-spin"></i> Locating closest...</div>';
+            
+            document.getElementById('btn-show-shelters').className = type === 'shelters' ? 'btn btn-primary' : 'btn btn-secondary';
+            document.getElementById('btn-show-hospitals').className = type === 'hospitals' ? 'btn btn-primary' : 'btn btn-secondary';
+            
+            try {
+                const list = await api.request(`/api/citizen/${type}?lat=${currentLat}&lng=${currentLng}`);
+                container.innerHTML = '';
+                
+                if (list.length === 0) {
+                    container.innerHTML = '<p style="text-align:center; font-size:11px; color:var(--text-secondary);">No active zones mapped.</p>';
+                    return;
+                }
+                
+                list.forEach(item => {
+                    const div = document.createElement('div');
+                    div.style.padding = '10px';
+                    div.style.border = '1px solid var(--border-color)';
+                    div.style.borderRadius = '6px';
+                    div.style.background = 'white';
+                    div.style.fontSize = '12px';
+                    
+                    if (type === 'shelters') {
+                        const occupancyPercent = Math.min(100, Math.round((item.current_occupancy / item.capacity) * 100));
+                        div.innerHTML = `
+                            <div style="display:flex; justify-content:space-between; margin-bottom: 2px;">
+                                <b><i class="fa-solid fa-house-chimney-medical" style="color:var(--color-primary-light);"></i> ${item.name}</b>
+                                <span style="font-weight:700; color:var(--color-low);">${item.distance} km</span>
+                            </div>
+                            <div style="font-size:10px; color:var(--text-secondary);">
+                                Capacity: <b>${item.current_occupancy} / ${item.capacity}</b> (${occupancyPercent}% full)<br/>
+                                Contact: <b>${item.contact || 'N/A'}</b>
+                            </div>
+                        `;
+                    } else {
+                        div.innerHTML = `
+                            <div style="display:flex; justify-content:space-between; margin-bottom: 2px;">
+                                <b><i class="fa-solid fa-hospital" style="color:var(--color-low);"></i> ${item.name}</b>
+                                <span style="font-weight:700; color:var(--color-low);">${item.distance} km</span>
+                            </div>
+                            <div style="font-size:10px; color:var(--text-secondary);">
+                                Emergency Beds Available: <b>${item.beds_available} beds</b><br/>
+                                Contact: <b>${item.contact || 'N/A'}</b>
+                            </div>
+                        `;
+                    }
+                    container.appendChild(div);
+                });
+                
+            } catch(e) {
+                container.innerHTML = '<p style="text-align:center; color:var(--color-critical); font-size:11px;">Failed to load locator feed.</p>';
+            }
+        }
+
+        function setupWebSockets() {
+            socket = io('/');
+            
+            socket.on('connect', () => {
+                console.log("WS Connected");
+                socket.emit('join_room', { room: 'citizen' });
+            });
+            
+            socket.on('sos_status_changed', (update) => {
+                if (activeSosId && update.sos_id === activeSosId) {
+                    checkRescueStatus();
+                }
+            });
+            
+            socket.on('team_location_update', (team) => {
+                if (activeSosId) {
+                    checkRescueStatus();
+                }
+            });
+            
+            socket.on('new_alert', () => {
+                loadActiveAlerts();
+                refreshNotificationBell();
+            });
+        }
+    </script>
+</body>
+</html>

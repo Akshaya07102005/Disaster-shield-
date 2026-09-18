@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Critical Cases — Government Portal</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header class="app-navbar"></header>
+    
+    <div class="portal-layout">
+        <aside class="sidebar"></aside>
+        
+        <main class="portal-content">
+            <div style="margin-bottom: 20px;">
+                <h2 style="font-size: 24px; font-weight: 800; color: var(--color-critical);">
+                    <i class="fa-solid fa-circle-radiation"></i> Critical & High Priority Incidents
+                </h2>
+                <p style="color: var(--text-secondary); font-size: 13px;">Auto-sorted triage queue displaying SOS alarms matching critical priority thresholds (Priority Score &gt;= 15.0).</p>
+            </div>
+
+            <div class="glass-panel" style="padding: 20px; border-top: 5px solid var(--color-critical);">
+                <div id="critical-table-container">
+                    <div style="text-align: center; color: var(--text-muted); padding: 40px;">
+                        <i class="fa-solid fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 10px;"></i>
+                        <p>Triage queue compiling...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'gov') {
+                window.location.href = '/login.html?role=gov';
+                return;
+            }
+            
+            components.renderNavbar("Critical Cases");
+            components.renderSidebar("/government/critical.html");
+            
+            await loadCriticalQueue();
+        });
+
+        async function loadCriticalQueue() {
+            try {
+                const list = await api.request('/api/gov/sos');
+                
+                // Filter critical cases (score >= 15.0) and sort descending
+                const criticalCases = list
+                    .filter(r => r.priority_score >= 15.0 && r.status !== 'resolved')
+                    .sort((a, b) => b.priority_score - a.priority_score);
+                
+                const cols = [
+                    { title: "Triage Score", field: "priority_score", render: (val) => {
+                        let color = 'var(--color-high)';
+                        if (val >= 25.0) color = 'var(--color-critical)';
+                        return `<span style="color:${color}; font-weight:900; font-size:15px;"><i class="fa-solid fa-fire-flame-curved"></i> ${val.toFixed(1)}</span>`;
+                    }},
+                    { title: "ID", field: "id", render: (val) => `<b>#${val}</b>` },
+                    { title: "Citizen Location", field: "citizen_name", render: (val, row) => `<b>${val}</b><br/><span style="font-size:10px; color:var(--text-muted);">${row.area_name}</span>` },
+                    { title: "Hazard", field: "emergency_type" },
+                    { title: "Affected", field: "people_affected", render: (val) => `<span style="font-weight:700; color:var(--color-critical);">${val} Persons</span>` },
+                    { title: "Needs & description", field: "description", render: (val, row) => {
+                        const med = row.medical_needs ? `<div style="font-size:10px; color:var(--color-critical); font-weight:700;"><i class="fa-solid fa-briefcase-medical"></i> Medical: ${row.medical_needs}</div>` : '';
+                        return `<div>${val || 'No description'}</div>${med}`;
+                    }},
+                    { title: "Status", field: "status", render: (val) => {
+                        const badgeClass = val === 'pending' ? 'role-gov' : 'role-ngo';
+                        return `<span class="user-badge ${badgeClass}">${val.toUpperCase()}</span>`;
+                    }}
+                ];
+                
+                components.renderDataTable('critical-table-container', cols, criticalCases);
+            } catch(e) {
+                console.error(e);
+            }
+        }
+    </script>
+</body>
+</html>

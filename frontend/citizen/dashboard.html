@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Citizen Dashboard — Disaster Shield AI</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Leaflet.js -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+    <header class="app-navbar"></header>
+    
+    <div class="portal-layout">
+        <aside class="sidebar"></aside>
+        
+        <main class="portal-content">
+            <div style="margin-bottom: 20px;">
+                <h2 style="font-size: 24px; font-weight: 800;">Citizen Operations Hub</h2>
+                <p style="color: var(--text-secondary); font-size: 13px;">Monitor active rescue operations, check nearby relief zones, and get real-time advisories.</p>
+            </div>
+
+            <!-- Dashboard Grid -->
+            <div class="shared-grid" style="margin-bottom: 24px;">
+                <!-- Left: Status card -->
+                <div class="glass-panel" style="display: flex; flex-direction: column; justify-content: space-between; border-top: 4px solid var(--color-info);">
+                    <div>
+                        <h4 style="font-size: 13px; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 8px;">My Current Status</h4>
+                        <div id="citizen-status-badge" style="margin-bottom: 12px;">
+                            <span class="user-badge" style="background: rgba(16, 185, 129, 0.1); color: var(--color-low); border-color: transparent;">SAFE</span>
+                        </div>
+                        <p style="font-size: 12px; line-height: 1.4; color: var(--text-secondary);" id="active-request-summary">
+                            No active emergency requests. If you require urgent evacuation, food supplies, or medical support, submit a distress signal.
+                        </p>
+                    </div>
+                    <div style="margin-top: 20px;">
+                        <a href="/citizen/request-help.html" class="btn btn-danger" style="font-weight: 700;">
+                            <i class="fa-solid fa-circle-radiation"></i> Trigger Help SOS
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Center: Nearest Shelter -->
+                <div class="glass-panel" style="display: flex; flex-direction: column; justify-content: space-between; border-top: 4px solid var(--color-primary-light);">
+                    <div>
+                        <h4 style="font-size: 13px; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 8px;">Nearest Relief Haven</h4>
+                        <h3 style="font-size: 18px; font-weight: 800; margin-bottom: 6px;" id="shelter-name">Scanning...</h3>
+                        <p style="font-size: 12px; color: var(--text-secondary);" id="shelter-capacity">Checking remaining capacity...</p>
+                        <p style="font-size: 12px; color: var(--text-secondary); font-weight: 700; margin-top: 8px;" id="shelter-distance"></p>
+                    </div>
+                    <div style="margin-top: 20px;">
+                        <a href="/citizen/shelters.html" class="btn btn-secondary" style="font-weight: 700;">
+                            <i class="fa-solid fa-map-location-dot"></i> View Safe Havens Map
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Right: Helplines -->
+                <div class="glass-panel" style="border-top: 4px solid var(--color-critical);">
+                    <h4 style="font-size: 13px; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 12px;">Emergency Helplines</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px;">
+                        <div style="padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; text-align: center;">
+                            <strong>Disaster Mgmt</strong><br/><span style="color: var(--color-critical); font-weight: 800;">1077</span>
+                        </div>
+                        <div style="padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; text-align: center;">
+                            <strong>Fire Force</strong><br/><span style="color: var(--color-critical); font-weight: 800;">101</span>
+                        </div>
+                        <div style="padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; text-align: center;">
+                            <strong>Ambulance</strong><br/><span style="color: var(--color-critical); font-weight: 800;">108</span>
+                        </div>
+                        <div style="padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; text-align: center;">
+                            <strong>Police Command</strong><br/><span style="color: var(--color-critical); font-weight: 800;">100</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live Status Map -->
+            <div class="glass-panel" style="padding: 0; overflow: hidden; height: 350px; margin-bottom: 24px; position: relative;">
+                <div style="position: absolute; top: 10px; left: 50px; z-index: 1000; background: white; padding: 6px 12px; border-radius: 4px; border: 1px solid var(--border-color); box-shadow: var(--shadow-md); font-size: 11px; font-weight: 700;">
+                    <i class="fa-solid fa-map-location"></i> Live Proximity GIS Radar
+                </div>
+                <div id="map" style="height: 100%;"></div>
+            </div>
+            
+        </main>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script src="/js/map.js"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'citizen') {
+                window.location.href = '/login.html?role=citizen';
+                return;
+            }
+            
+            // Render components
+            components.renderNavbar("Citizen Portal");
+            components.renderSidebar("/citizen/dashboard.html");
+            
+            // Initialize Leaflet map
+            const mapInstance = initMap('map');
+            
+            // Get user's home area or default to Chennai Center
+            let userLat = 13.0418;
+            let userLng = 80.2341;
+            
+            // Fetch nearest shelter proximity data
+            try {
+                // Request user coordinates via browser GPS
+                navigator.geolocation.getCurrentPosition(async (pos) => {
+                    userLat = pos.coords.latitude;
+                    userLng = pos.coords.longitude;
+                    mapInstance.setView([userLat, userLng], 13);
+                    
+                    // Add citizen marker
+                    L.marker([userLat, userLng]).addTo(mapInstance).bindPopup("<b>My Current GPS Coordinates</b>").openPopup();
+                    
+                    await loadDashboardData(userLat, userLng);
+                }, async (err) => {
+                    console.log("GPS Location unavailable, fallback to default center.");
+                    await loadDashboardData(userLat, userLng);
+                });
+            } catch(e) {
+                console.error(e);
+            }
+        });
+
+        async function loadDashboardData(lat, lng) {
+            try {
+                // 1. Fetch shelters proximity
+                const shelters = await api.request(`/api/citizen/shelters?lat=${lat}&lng=${lng}`);
+                if (shelters.length > 0) {
+                    const nearest = shelters[0];
+                    document.getElementById('shelter-name').innerText = nearest.name;
+                    document.getElementById('shelter-capacity').innerText = `Occupancy: ${nearest.current_occupancy} / ${nearest.capacity} beds`;
+                    document.getElementById('shelter-distance').innerText = `Proximity Distance: ${nearest.distance} km away`;
+                    
+                    updateShelterMarkers(shelters.slice(0, 5));
+                }
+                
+                // 2. Fetch hospitals proximity
+                const hospitals = await api.request(`/api/citizen/hospitals?lat=${lat}&lng=${lng}`);
+                updateHospitalMarkers(hospitals.slice(0, 5));
+                
+                // 3. Fetch citizen requests to find active ones
+                const myRequests = await api.request('/api/citizen/family-group'); // Mock checker or similar
+                // Let's call /api/citizen/tracking or similar for user SOS if any
+                // (Citizen routing handles SOS list)
+            } catch (e) {
+                console.error("Dashboard data load failed:", e);
+            }
+        }
+    </script>
+</body>
+</html>

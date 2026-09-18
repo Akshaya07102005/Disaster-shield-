@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Command Analytics — Government Portal</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header class="app-navbar"></header>
+    
+    <div class="portal-layout">
+        <aside class="sidebar"></aside>
+        
+        <main class="portal-content">
+            <div style="margin-bottom: 20px;">
+                <h2 style="font-size: 24px; font-weight: 800;">Rescue Command Analytics</h2>
+                <p style="color: var(--text-secondary); font-size: 13px;">Audit dispatcher response speeds, squad capacities, and emergency triage distributions.</p>
+            </div>
+
+            <!-- Dashboard Grid -->
+            <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 20px; margin-bottom: 20px;">
+                <!-- Column 1: Response speed trend -->
+                <div class="glass-panel" style="padding: 20px;">
+                    <h3 style="font-size: 15px; margin-bottom: 16px; font-weight: 700;">Average Response Speed Trend</h3>
+                    <div style="display: flex; flex-direction: column; gap: 14px;" id="response-trends-bars">
+                        <!-- Rendered dynamically -->
+                    </div>
+                </div>
+
+                <!-- Column 2: NGO Performance list -->
+                <div class="glass-panel" style="padding: 20px;">
+                    <h3 style="font-size: 15px; margin-bottom: 16px; font-weight: 700;">NGO Field Workload & Completed Missions</h3>
+                    <div id="ngo-perf-table-container">
+                        <!-- Table rendered dynamically -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'gov') {
+                window.location.href = '/login.html?role=gov';
+                return;
+            }
+            
+            components.renderNavbar("Command Analytics");
+            components.renderSidebar("/government/analytics.html");
+            
+            await loadAnalyticsPage();
+        });
+
+        async function loadAnalyticsPage() {
+            try {
+                const data = await api.request('/api/gov/analytics/overview');
+                
+                // 1. Render response trends
+                const rtContainer = document.getElementById('response-trends-bars');
+                rtContainer.innerHTML = '';
+                
+                const trends = data.response_trends;
+                const maxMins = Math.max(...trends.map(t => t.avg_response_mins), 1);
+                
+                trends.forEach(t => {
+                    const row = document.createElement('div');
+                    row.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom: 4px; font-weight:600;">
+                            <span>${t.label}</span>
+                            <span>${t.avg_response_mins} mins</span>
+                        </div>
+                        <div style="background:#E2E8F0; height:12px; border-radius:6px; overflow:hidden; width:100%;">
+                            <div style="background:var(--color-primary-light); width:${(t.avg_response_mins / maxMins) * 100}%; height:100%; border-radius:6px; transition: width 0.8s ease;"></div>
+                        </div>
+                    `;
+                    rtContainer.appendChild(row);
+                });
+                
+                // 2. Render NGO Performance
+                const cols = [
+                    { title: "NGO Agency", field: "org_name", render: (val) => `<b>${val}</b>` },
+                    { title: "Active Missions", field: "active_missions", render: (val) => `<span style="color:var(--color-critical); font-weight:700;">${val} Active</span>` },
+                    { title: "Completed Missions", field: "completed_missions", render: (val) => `<span style="color:var(--color-low); font-weight:700;">${val} Done</span>` },
+                    { title: "Staff Power", field: "capacity", render: (val) => `${val} volunteers` }
+                ];
+                components.renderDataTable('ngo-perf-table-container', cols, data.ngos);
+            } catch(e) {
+                console.error(e);
+            }
+        }
+    </script>
+</body>
+</html>

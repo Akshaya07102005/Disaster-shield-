@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Emergency Assistant — Disaster Shield AI</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header class="app-navbar"></header>
+    
+    <div class="portal-layout">
+        <aside class="sidebar"></aside>
+        
+        <main class="portal-content">
+            <div style="margin-bottom: 16px;">
+                <h2 style="font-size: 24px; font-weight: 800;"><i class="fa-solid fa-robot" style="color:var(--color-success);"></i> AI Emergency Advisor</h2>
+                <p style="color: var(--text-secondary); font-size: 13px;">Get instant preparedness suggestions, checklists, and 40 verified disaster safety protocols. Labeled for advisory decision-support only.</p>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; height: calc(100vh - 170px);">
+                <!-- Left: AI Chat Bot -->
+                <div id="ai-chat-container" style="height: 100%; display: flex; flex-direction: column;"></div>
+                
+                <!-- Right: Categorized Questions Explorer & Checklists -->
+                <div class="glass-panel" style="overflow-y: auto; height: 100%; display:flex; flex-direction:column; padding:16px;">
+                    <!-- Tab Switcher -->
+                    <div style="display: flex; gap: 8px; margin-bottom: 14px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                        <button id="tab-btn-questions" class="btn btn-primary" style="font-size: 11px; padding: 6px 12px; width: auto;">
+                            <i class="fa-solid fa-list-check"></i> 40 Default Questions
+                        </button>
+                        <button id="tab-btn-guides" class="btn btn-outline" style="font-size: 11px; padding: 6px 12px; width: auto;">
+                            <i class="fa-solid fa-clipboard-list"></i> Safety Checklists
+                        </button>
+                    </div>
+
+                    <!-- Tab 1: 40 Default Questions List -->
+                    <div id="view-questions" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;">
+                        <div style="font-size: 12px; color: var(--text-secondary);">
+                            Click any of the 40 questions below to automatically ask the AI Advisor:
+                        </div>
+                        <div id="side-questions-list" style="display: flex; flex-direction: column; gap: 6px;"></div>
+                    </div>
+
+                    <!-- Tab 2: Checklists -->
+                    <div id="view-guides" style="flex: 1; overflow-y: auto; display: none; flex-direction: column; gap: 12px;">
+                        <details class="guide-details" open>
+                            <summary style="font-weight: 700; cursor: pointer; padding: 6px; font-size: 13px; color: var(--color-primary-light);">Flood Preparedness Checklist</summary>
+                            <ul style="padding-left: 20px; font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin-top: 6px;">
+                                <li>Move critical electronics, documents, and valuables to upper floors.</li>
+                                <li>Store clean drinking water in clean bottles for at least 3 days.</li>
+                                <li>Keep emergency lighting (flashlights, candles, matches) in a dry bag.</li>
+                                <li>Turn off the main electrical switch and gas valve if water enters your house.</li>
+                                <li>Keep a bag packed with dry foods, first-aid kits, and essential medications.</li>
+                            </ul>
+                        </details>
+                        
+                        <details class="guide-details">
+                            <summary style="font-weight: 700; cursor: pointer; padding: 6px; font-size: 13px; color: var(--color-primary-light);">Cyclone Preparedness Checklist</summary>
+                            <ul style="padding-left: 20px; font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin-top: 6px;">
+                                <li>Inspect roof structures and fasten loose sheets.</li>
+                                <li>Keep windows securely shut and board them up if wind speeds exceed 90km/h.</li>
+                                <li>Charge mobile phones, power banks, and flashlights to 100% capacity.</li>
+                                <li>Clear surrounding drains of leaves and debris to prevent clogging.</li>
+                                <li>Stay indoors away from windows until the storm has completely passed.</li>
+                            </ul>
+                        </details>
+                        
+                        <details class="guide-details">
+                            <summary style="font-weight: 700; cursor: pointer; padding: 6px; font-size: 13px; color: var(--color-primary-light);">Emergency Kit — What to Carry</summary>
+                            <ul style="padding-left: 20px; font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin-top: 6px;">
+                                <li>Bottled water (3 liters per person per day).</li>
+                                <li>Non-perishable food items (biscuits, energy bars, dry fruit).</li>
+                                <li>Personal hygiene items (wet wipes, hand sanitizer, soap).</li>
+                                <li>First-aid kit (bandages, antiseptic ointment, pain relievers, prescription medicines).</li>
+                                <li>Photocopies of identification documents (Aadhaar, passport, ration card) in a waterproof plastic sleeve.</li>
+                            </ul>
+                        </details>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'citizen') {
+                window.location.href = '/login.html?role=citizen';
+                return;
+            }
+            
+            components.renderNavbar("AI Assistant");
+            components.renderSidebar("/citizen/assistant.html");
+            
+            // Render shared AI assistant panel
+            components.renderAIChatPanel('ai-chat-container', '/api/citizen/assistant');
+
+            // Render Right Side 40 Questions List
+            const sideList = document.getElementById('side-questions-list');
+            const questions = components.botQuestions;
+            
+            // Group by category
+            const categories = {};
+            questions.forEach(q => {
+                if (!categories[q.category]) categories[q.category] = [];
+                categories[q.category].push(q);
+            });
+
+            Object.keys(categories).forEach(cat => {
+                const header = document.createElement('div');
+                header.style.cssText = "font-weight: 700; font-size: 12px; color: var(--color-primary); margin-top: 8px; margin-bottom: 4px; display:flex; align-items:center; gap:6px;";
+                header.innerHTML = `<i class="fa-solid ${categories[cat][0].icon}" style="color:var(--color-info);"></i> ${cat} (${categories[cat].length})`;
+                sideList.appendChild(header);
+
+                categories[cat].forEach(item => {
+                    const btn = document.createElement('button');
+                    btn.className = 'ai-question-chip';
+                    btn.style.cssText = "width: 100%; justify-content: space-between; margin-bottom: 3px; font-size: 11px; padding: 6px 10px;";
+                    btn.innerHTML = `<span><strong>#${item.id}.</strong> ${item.q}</span> <i class="fa-solid fa-arrow-right" style="color:var(--color-primary-light);"></i>`;
+                    btn.onclick = () => {
+                        const input = document.getElementById('ai-chat-input');
+                        if (input) {
+                            input.value = item.q;
+                            const sendBtn = document.getElementById('btn-send-ai');
+                            if (sendBtn) sendBtn.click();
+                        }
+                    };
+                    sideList.appendChild(btn);
+                });
+            });
+
+            // Tab switching logic
+            const tabQuestions = document.getElementById('tab-btn-questions');
+            const tabGuides = document.getElementById('tab-btn-guides');
+            const viewQuestions = document.getElementById('view-questions');
+            const viewGuides = document.getElementById('view-guides');
+
+            tabQuestions.onclick = () => {
+                tabQuestions.className = 'btn btn-primary';
+                tabGuides.className = 'btn btn-outline';
+                viewQuestions.style.display = 'flex';
+                viewGuides.style.display = 'none';
+            };
+
+            tabGuides.onclick = () => {
+                tabGuides.className = 'btn btn-primary';
+                tabQuestions.className = 'btn btn-outline';
+                viewGuides.style.display = 'flex';
+                viewQuestions.style.display = 'none';
+            };
+        });
+    </script>
+</body>
+</html>

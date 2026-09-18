@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Request Help — Disaster Shield AI</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header class="app-navbar"></header>
+    
+    <div class="portal-layout">
+        <aside class="sidebar"></aside>
+        
+        <main class="portal-content">
+            <div style="margin-bottom: 20px; max-width: 650px;">
+                <h2 style="font-size: 24px; font-weight: 800; color: var(--color-critical);">
+                    <i class="fa-solid fa-circle-exclamation"></i> Emergency Assistance Request
+                </h2>
+                <p style="color: var(--text-secondary); font-size: 13px;">
+                    Fill in your current situation. Your inputs will be evaluated by the triage engine to assign priority ranking. False reporting is punishable under civil audit codes.
+                </p>
+            </div>
+
+            <div class="glass-panel" style="max-width: 650px; border-top: 5px solid var(--color-critical);">
+                <form id="form-sos" onsubmit="preSubmitSos(event)">
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div class="form-group">
+                            <label class="form-label" for="sos-name">Contact Name</label>
+                            <input class="form-control" type="text" id="sos-name" required placeholder="E.g., Raman Nathan">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="sos-phone">Contact Phone</label>
+                            <input class="form-control" type="tel" id="sos-phone" required placeholder="E.g., 9944002211" pattern="[6-9][0-9]{9}" title="Please enter a valid 10-digit mobile number">
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div class="form-group">
+                            <label class="form-label" for="sos-type">Emergency Type</label>
+                            <select class="form-control" id="sos-type" required>
+                                <option value="">Select hazard type...</option>
+                                <option value="Flood">Flood / Inundation</option>
+                                <option value="Cyclone">Cyclone / High Winds</option>
+                                <option value="Fire">Fire Hazard</option>
+                                <option value="Medical">Medical Urgent Evac</option>
+                                <option value="Trapped">Structural Collapse / Trapped</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">GPS Coordinate Position</label>
+                            <div style="display: flex; gap: 6px;">
+                                <input class="form-control" type="text" id="sos-gps" readonly required placeholder="Acquiring GPS..." style="font-family: monospace; font-size: 11px;">
+                                <button class="btn btn-secondary" type="button" onclick="acquireLocation()" id="btn-gps" style="width: auto; padding: 0 12px; font-size: 11px;">
+                                    <i class="fa-solid fa-location-crosshairs"></i> Refresh
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Vulnerable people breakdown -->
+                    <div class="form-group" style="background: #F8FAFC; padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                        <label class="form-label" style="margin-bottom: 10px; color: var(--color-primary);">Family Headcount Details</label>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px;">
+                            <div>
+                                <label class="form-label" style="font-size: 10px;" for="sos-kids">Children (under 12)</label>
+                                <input class="form-control" type="number" id="sos-kids" min="0" value="0" style="padding: 6px 10px;">
+                            </div>
+                            <div>
+                                <label class="form-label" style="font-size: 10px;" for="sos-elders">Elderly (above 60)</label>
+                                <input class="form-control" type="number" id="sos-elders" min="0" value="0" style="padding: 6px 10px;">
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                            <div>
+                                <label class="form-label" style="font-size: 10px;" for="sos-disabled">Vulnerable / PWDs</label>
+                                <input class="form-control" type="number" id="sos-disabled" min="0" value="0" style="padding: 6px 10px;">
+                            </div>
+                            <div>
+                                <label class="form-label" style="font-size: 10px;" for="sos-injured">Injured Persons</label>
+                                <input class="form-control" type="number" id="sos-injured" min="0" value="0" style="padding: 6px 10px;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Medical flag & needs checkboxes -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                        <div class="form-group">
+                            <label class="form-label" for="sos-medical-flag">Medical Emergency?</label>
+                            <select class="form-control" id="sos-medical-flag" onchange="toggleMedicalNeeds(this.value)" required>
+                                <option value="no">No</option>
+                                <option value="yes">Yes (Evacuation Required)</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="medical-details-group" style="display: none;">
+                            <label class="form-label" for="sos-medical-desc">Specify Medical Needs</label>
+                            <input class="form-control" type="text" id="sos-medical-desc" placeholder="E.g., Heart patient, pregnancy, wound...">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Resource Support Required</label>
+                        <div style="display: flex; gap: 16px; flex-wrap: wrap; margin-top: 6px; font-size: 13px;">
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <input type="checkbox" id="need-rescue" checked style="width: 15px; height: 15px; accent-color: var(--color-critical);"> Evacuation / Rescue Squad
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <input type="checkbox" id="need-food" style="width: 15px; height: 15px; accent-color: var(--color-critical);"> Food & Water Supplies
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <input type="checkbox" id="need-shelter" style="width: 15px; height: 15px; accent-color: var(--color-critical);"> Shelter Haven
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="sos-desc">Situation Description</label>
+                        <textarea class="form-control" id="sos-desc" rows="3" required placeholder="Describe details (water levels, surrounding street names, access obstacles)..."></textarea>
+                    </div>
+
+                    <!-- Safety center disclaimer alert -->
+                    <div style="background: rgba(194, 43, 43, 0.05); border: 1.5px solid rgba(194,43,43,0.2); padding: 12px; border-radius: var(--radius-sm); font-size: 11px; line-height: 1.45; color: var(--color-critical); margin-bottom: 16px;">
+                        <i class="fa-solid fa-circle-info"></i> <b>Life-Threatening Emergency Notice:</b> If you are in immediate physical danger, do not rely solely on digital dashboards. Call <b>101, 108 or 1077</b> immediately on landlines/mobiles.
+                    </div>
+
+                    <button class="btn btn-danger" type="submit" style="padding: 12px; font-weight: 700;">
+                        <i class="fa-solid fa-paper-plane"></i> Broadcast Emergency SOS
+                    </button>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+        let currentLat = null;
+        let currentLng = null;
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'citizen') {
+                window.location.href = '/login.html?role=citizen';
+                return;
+            }
+            
+            components.renderNavbar("Request Assistance");
+            components.renderSidebar("/citizen/request-help.html");
+            
+            document.getElementById('sos-name').value = user.name;
+            document.getElementById('sos-phone').value = user.phone;
+            
+            acquireLocation();
+        });
+
+        function acquireLocation() {
+            const gpsInput = document.getElementById('sos-gps');
+            gpsInput.value = "Acquiring precision GPS...";
+            
+            navigator.geolocation.getCurrentPosition((pos) => {
+                currentLat = pos.coords.latitude;
+                currentLng = pos.coords.longitude;
+                gpsInput.value = `${currentLat.toFixed(5)}, ${currentLng.toFixed(5)}`;
+            }, (err) => {
+                // Fallback to Chennai Center
+                currentLat = 13.0418 + (Math.random() - 0.5) * 0.01;
+                currentLng = 80.2341 + (Math.random() - 0.5) * 0.01;
+                gpsInput.value = `${currentLat.toFixed(5)}, ${currentLng.toFixed(5)} (Fallback)`;
+            });
+        }
+
+        function toggleMedicalNeeds(val) {
+            const group = document.getElementById('medical-details-group');
+            const descInput = document.getElementById('sos-medical-desc');
+            if (val === 'yes') {
+                group.style.display = 'block';
+                descInput.required = true;
+            } else {
+                group.style.display = 'none';
+                descInput.required = false;
+                descInput.value = '';
+            }
+        }
+
+        function preSubmitSos(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('sos-name').value;
+            const phone = document.getElementById('sos-phone').value;
+            const kids = parseInt(document.getElementById('sos-kids').value);
+            const elders = parseInt(document.getElementById('sos-elders').value);
+            const disabled = parseInt(document.getElementById('sos-disabled').value);
+            const injured = parseInt(document.getElementById('sos-injured').value);
+            const totalHeadcount = 1 + kids + elders + disabled + injured;
+            
+            const title = "Confirm Evacuation Broadcast";
+            const message = `Are you sure you want to broadcast this SOS alert for a headcount of ${totalHeadcount} citizens? Evacuation support will be alerted based on this data.`;
+            
+            components.showConfirmationDialog(title, message, submitSos);
+        }
+
+        async function submitSos() {
+            const type = document.getElementById('sos-type').value;
+            const kids = parseInt(document.getElementById('sos-kids').value);
+            const elders = parseInt(document.getElementById('sos-elders').value);
+            const disabled = parseInt(document.getElementById('sos-disabled').value);
+            const injured = parseInt(document.getElementById('sos-injured').value);
+            const medFlag = document.getElementById('sos-medical-flag').value;
+            const medicalDesc = document.getElementById('sos-medical-desc').value;
+            const desc = document.getElementById('sos-desc').value;
+            
+            const totalPeople = 1 + kids + elders + disabled + injured;
+            
+            const payload = {
+                latitude: currentLat,
+                longitude: currentLng,
+                emergency_type: type,
+                people_affected: totalPeople,
+                medical_needs: medFlag === 'yes' ? medicalDesc : null,
+                description: desc
+            };
+            
+            try {
+                const res = await api.request('/api/citizen/sos', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                
+                alert(`SOS Broadcast Generated! Request ID: #${res.sos.id}. Criticality Priority Score: ${res.sos.priority_score}`);
+                window.location.href = `/citizen/tracking.html?sos_id=${res.sos.id}`;
+            } catch(e) {
+                alert(`Failed to broadcast: ${e.message || 'Unknown error'}`);
+            }
+        }
+    </script>
+</body>
+</html>

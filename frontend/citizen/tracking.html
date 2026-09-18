@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Tracking — Disaster Shield AI</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Leaflet.js -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+    <header class="app-navbar"></header>
+    
+    <div class="portal-layout">
+        <aside class="sidebar"></aside>
+        
+        <main class="portal-content">
+            <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <h2 style="font-size: 24px; font-weight: 800;">Live Rescue Operations Tracking</h2>
+                    <p style="color: var(--text-secondary); font-size: 13px;">Follow the real-time position of the assigned NGO response team as they approach your location.</p>
+                </div>
+                <div class="user-badge" style="background: rgba(220, 38, 38, 0.1); color: var(--color-critical); border-color: var(--color-critical); font-size: 11px; font-weight: 800; animation: pulse 1.5s infinite; display: inline-flex; align-items: center; gap: 4px;">
+                    <i class="fa-solid fa-triangle-exclamation"></i> DEMO SIMULATION fallback
+                </div>
+            </div>
+
+            <!-- Layout Grid -->
+            <div style="display: grid; grid-template-columns: 1fr 340px; gap: 20px; height: calc(100vh - 180px);">
+                <!-- Map Panel -->
+                <div class="glass-panel" style="padding:0; overflow:hidden; height:100%; position:relative;">
+                    <div id="map" style="height:100%;"></div>
+                </div>
+
+                <!-- Info Sidebar Panel -->
+                <div class="glass-panel" style="display: flex; flex-direction: column; gap: 16px; overflow-y: auto; height: 100%;">
+                    <div>
+                        <h4 style="font-size:11px; color: var(--text-muted); text-transform:uppercase; margin-bottom:4px;">Request Identification</h4>
+                        <h3 style="font-size:18px; font-weight:800;" id="track-sos-id">SOS #Scan...</h3>
+                    </div>
+
+                    <!-- Flow Checklist Tracker -->
+                    <div style="display: flex; flex-direction: column; gap: 8px; border-left: 2.5px solid var(--border-color); padding-left: 14px; margin: 10px 0;" id="workflow-tracker">
+                        <div class="track-step" id="step-pending"><span>1</span> SOS Registered</div>
+                        <div class="track-step" id="step-assigned"><span>2</span> Responder Assigned</div>
+                        <div class="track-step" id="step-dispatched"><span>3</span> Squad Dispatched</div>
+                        <div class="track-step" id="step-approaching"><span>4</span> Team Approaching</div>
+                        <div class="track-step" id="step-completed"><span>5</span> Rescue Completed</div>
+                    </div>
+
+                    <!-- Team Status Indicators -->
+                    <div class="glass-panel" style="background: #F8FAFC; padding: 12px;" id="team-info-box">
+                        <h4 style="font-size:12px; margin-bottom: 6px;"><i class="fa-solid fa-truck-pickup" style="color: var(--color-primary-light);"></i> Dispatch Metrics</h4>
+                        <div style="font-size:12px; display:flex; flex-direction:column; gap:6px;">
+                            <div><b>Assigned NGO:</b> <span id="ngo-name">Waiting...</span></div>
+                            <div><b>Response Team:</b> <span id="team-name">Waiting...</span></div>
+                            <div><b>ETA:</b> <span id="tracking-eta" style="color: var(--color-critical); font-weight:800;">TBD</span></div>
+                            <div><b>Proximity:</b> <span id="tracking-distance" style="font-weight:700;">TBD</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script src="/js/map.js"></script>
+    <script>
+        let mapInstance;
+        let sosId;
+        let citizenMarker;
+        let teamMarker;
+        let routePolyline;
+        let trackingInterval;
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'citizen') {
+                window.location.href = '/login.html?role=citizen';
+                return;
+            }
+            
+            components.renderNavbar("Rescue Tracking");
+            components.renderSidebar("/citizen/tracking.html");
+            
+            const params = new URLSearchParams(window.location.search);
+            sosId = params.get('sos_id');
+            if (!sosId) {
+                document.querySelector('.portal-content').innerHTML = `
+                    <div style="text-align: center; padding: 50px; color: var(--text-secondary);">
+                        <i class="fa-solid fa-circle-question" style="font-size: 36px; margin-bottom: 12px; color: var(--color-critical);"></i>
+                        <p>No active SOS request reference specified for tracking. Submit a help request first.</p>
+                        <a href="/citizen/request-help.html" class="btn btn-primary" style="width: auto; margin-top: 15px;">Report Emergency</a>
+                    </div>
+                `;
+                return;
+            }
+            
+            document.getElementById('track-sos-id').innerText = `SOS Request #${sosId}`;
+            mapInstance = initMap('map');
+            
+            await updateTracking();
+            trackingInterval = setInterval(updateTracking, 5000); // Polling fallback every 5s
+
+            // Real-time Socket.IO integration
+            if (typeof io !== 'undefined') {
+                try {
+                    const socket = io();
+                    socket.on('connect', () => {
+                        socket.emit('join_room', { room: 'citizen' });
+                    });
+                    socket.on('team_location_update', (team) => {
+                        console.log('Real-time team location received:', team);
+                        updateTracking();
+                    });
+                    socket.on('sos_status_changed', (data) => {
+                        if (data && (data.sos_id == sosId || (data.mission && data.mission.sos_request_id == sosId))) {
+                            console.log('Real-time mission status changed:', data);
+                            updateTracking();
+                        }
+                    });
+                } catch(e) {
+                    console.log('Tracking socket fallback to polling:', e);
+                }
+            }
+        });
+
+        async function updateTracking() {
+            try {
+                const data = await api.request(`/api/citizen/sos/${sosId}/track`);
+                const sos = data.sos;
+                const mission = data.mission;
+                const activeTeams = data.active_rescue_teams || [];
+                
+                // Add citizen coordinate marker
+                if (!citizenMarker) {
+                    citizenMarker = L.marker([sos.latitude, sos.longitude]).addTo(mapInstance).bindPopup("<b>My Distress Location</b>").openPopup();
+                    mapInstance.setView([sos.latitude, sos.longitude], 14);
+                }
+                
+                // Update progress flow steps
+                resetWorkflowSteps();
+                document.getElementById('step-pending').classList.add('done');
+                
+                if (sos.status === 'pending') {
+                    // Waiting for allocation
+                } else if (sos.status === 'assigned' || sos.status === 'in-progress' || sos.status === 'resolved') {
+                    document.getElementById('step-assigned').classList.add('done');
+                    
+                    if (mission) {
+                        document.getElementById('ngo-name').innerText = mission.ngo_name;
+                        
+                        if (mission.status === 'accepted') {
+                            document.getElementById('step-dispatched').classList.add('done');
+                        } else if (mission.status === 'en-route') {
+                            document.getElementById('step-dispatched').classList.add('done');
+                            document.getElementById('step-approaching').classList.add('done');
+                        } else if (mission.status === 'completed' || sos.status === 'resolved') {
+                            document.getElementById('step-dispatched').classList.add('done');
+                            document.getElementById('step-approaching').classList.add('done');
+                            document.getElementById('step-completed').classList.add('done');
+                            
+                            document.getElementById('tracking-eta').innerText = "Arrived";
+                            document.getElementById('tracking-distance').innerText = "0 km";
+                            clearInterval(trackingInterval);
+                        }
+                        
+                        // Map tracking with active rescue teams
+                        if (activeTeams.length > 0) {
+                            const team = activeTeams[0];
+                            document.getElementById('team-name').innerText = team.team_name;
+                            
+                            // Simulate coordinates logic
+                            let teamLat = team.current_lat;
+                            let teamLng = team.current_lng;
+                            
+                            if (teamLat === null || teamLng === null) {
+                                // Fallback: simulate an approaching team starting 1.5km away
+                                teamLat = sos.latitude + 0.008;
+                                teamLng = sos.longitude - 0.006;
+                            }
+                            
+                            if (!teamMarker) {
+                                const teamIcon = L.divIcon({
+                                    className: 'team-track-marker',
+                                    html: `<div style="display:flex; justify-content:center; align-items:center; width:30px; height:30px; border-radius:50%; background:#7C3AED; border:2px solid white; color:white;"><i class="fa-solid fa-people-group"></i></div>`,
+                                    iconSize: [30, 30],
+                                    iconAnchor: [15, 15]
+                                });
+                                teamMarker = L.marker([teamLat, teamLng], { icon: teamIcon }).addTo(mapInstance).bindPopup(`<b>Rescue Team: ${team.team_name}</b>`);
+                            } else {
+                                teamMarker.setLatLng([teamLat, teamLng]);
+                            }
+                            
+                            // Draw path
+                            if (routePolyline) {
+                                routePolyline.setLatLngs([[teamLat, teamLng], [sos.latitude, sos.longitude]]);
+                            } else {
+                                routePolyline = L.polyline([[teamLat, teamLng], [sos.latitude, sos.longitude]], { color: '#7C3AED', weight: 4, dashArray: '8, 8' }).addTo(mapInstance);
+                            }
+                            
+                            // Compute mock Distance & ETA
+                            const latDiff = teamLat - sos.latitude;
+                            const lngDiff = teamLng - sos.longitude;
+                            const distKm = Math.sqrt(latDiff*latDiff + lngDiff*lngDiff) * 111.0;
+                            const etaMins = Math.round(distKm * 5); // 5 mins per km
+                            
+                            document.getElementById('tracking-distance').innerText = `${distKm.toFixed(2)} km`;
+                            document.getElementById('tracking-eta').innerText = `${etaMins} mins`;
+                            
+                            // Auto fit map bounds to show both user and squad
+                            const bounds = L.latLngBounds([[teamLat, teamLng], [sos.latitude, sos.longitude]]);
+                            mapInstance.fitBounds(bounds, { padding: [40, 40] });
+                        }
+                    }
+                }
+            } catch(e) {
+                console.error("Tracking update failed:", e);
+            }
+        }
+
+        function resetWorkflowSteps() {
+            const steps = document.querySelectorAll('.track-step');
+            steps.forEach(s => s.classList.remove('done'));
+        }
+    </script>
+    <style>
+        .track-step {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            padding: 4px 0;
+        }
+        .track-step span {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #E2E8F0;
+            color: var(--text-secondary);
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .track-step.done {
+            color: var(--color-primary-light);
+        }
+        .track-step.done span {
+            background: var(--color-success);
+            color: white;
+        }
+    </style>
+</body>
+</html>

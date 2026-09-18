@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Member Directory — Disaster Shield AI</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header class="app-navbar"></header>
+    
+    <div class="portal-layout">
+        <aside class="sidebar"></aside>
+        
+        <main class="portal-content">
+            <div style="margin-bottom: 20px;">
+                <h2 style="font-size: 24px; font-weight: 800;">NGO Volunteers & Members</h2>
+                <p style="color: var(--text-secondary); font-size: 13px;">Manage response squads and assign volunteers. Showing seeded 20,000 members record set with database indexing.</p>
+            </div>
+
+            <!-- Filters Panel -->
+            <div class="glass-panel" style="padding: 16px; margin-bottom: 20px;">
+                <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;">
+                    <div class="form-group" style="margin-bottom: 0; flex: 1.5; min-width: 200px;">
+                        <label class="form-label" style="font-size: 10px;">Search Volunteers</label>
+                        <input class="form-control" type="text" id="filter-search" placeholder="Search by name, region, phone..." oninput="triggerSearch()" style="padding: 8px 12px; font-size: 12px;">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 140px;">
+                        <label class="form-label" style="font-size: 10px;">Filter Skill</label>
+                        <select class="form-control" id="filter-skill" onchange="triggerFilters()" style="padding: 8px 12px; font-size: 12px;">
+                            <option value="">All Skills</option>
+                            <option value="rescue">Rescue</option>
+                            <option value="food distribution">Food Distribution</option>
+                            <option value="medical support">Medical Support</option>
+                            <option value="shelter management">Shelter Management</option>
+                            <option value="transportation">Transportation</option>
+                            <option value="communication">Communication</option>
+                            <option value="logistics">Logistics</option>
+                            <option value="disaster response">Disaster Response</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 140px;">
+                        <label class="form-label" style="font-size: 10px;">Availability</label>
+                        <select class="form-control" id="filter-avail" onchange="triggerFilters()" style="padding: 8px 12px; font-size: 12px;">
+                            <option value="">All Statuses</option>
+                            <option value="available">Available</option>
+                            <option value="active">Active</option>
+                            <option value="offline">Offline</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-secondary" onclick="clearFilters()" style="width: auto; padding: 9px 16px; font-size:12px; height: 38px;">
+                        <i class="fa-solid fa-filter-circle-xmark"></i> Clear
+                    </button>
+                </div>
+            </div>
+
+            <!-- DataTable container -->
+            <div id="members-table-container">
+                <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                    <i class="fa-solid fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 10px;"></i>
+                    <p>Fetching members registry...</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+        let currentPage = 1;
+        let limit = 20;
+        let sortBy = 'name';
+        let sortOrder = 'asc';
+        let searchTimeout = null;
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'ngo') {
+                window.location.href = '/login.html?role=ngo';
+                return;
+            }
+            
+            components.renderNavbar("Member Directory");
+            components.renderSidebar("/ngo/members.html");
+            
+            await fetchMembers();
+        });
+
+        async function fetchMembers() {
+            try {
+                const search = document.getElementById('filter-search').value.trim();
+                const skill = document.getElementById('filter-skill').value;
+                const availability = document.getElementById('filter-avail').value;
+                
+                let url = `/api/ngo/members?page=${currentPage}&limit=${limit}&sort_by=${sortBy}&sort_order=${sortOrder}`;
+                if (search) url += `&search=${encodeURIComponent(search)}`;
+                if (skill) url += `&skill=${encodeURIComponent(skill)}`;
+                if (availability) url += `&availability=${encodeURIComponent(availability)}`;
+                
+                const data = await api.request(url);
+                
+                const columns = [
+                    { title: "ID", field: "id", render: (val) => `<b>#${val}</b>` },
+                    { title: "Name", field: "name", sortable: true, render: (val) => `<span style="font-weight:700;">${val}</span>` },
+                    { title: "Age", field: "age", sortable: true },
+                    { title: "Contact", field: "phone" },
+                    { title: "Region", field: "region", sortable: true },
+                    { title: "Special Skill", field: "skill", render: (val) => `<span class="user-badge role-gov" style="font-size:10px; text-transform:uppercase;">${val}</span>` },
+                    { title: "Availability", field: "availability", render: (val) => {
+                        let badgeClass = 'role-citizen';
+                        if (val === 'active') badgeClass = 'role-ngo';
+                        if (val === 'offline') badgeClass = 'role-gov';
+                        return `<span class="user-badge ${badgeClass}">${val.toUpperCase()}</span>`;
+                    }},
+                    { title: "Current Assignment", field: "current_assignment", render: (val) => val || 'None' }
+                ];
+                
+                components.renderDataTable('members-table-container', columns, data.members, {
+                    pagination: {
+                        page: data.page,
+                        pages: data.pages,
+                        total: data.total,
+                        onPrevPage: "changePage(-1)",
+                        onNextPage: "changePage(1)"
+                    },
+                    onSort: (field) => {
+                        if (sortBy === field) {
+                            sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+                        } else {
+                            sortBy = field;
+                            sortOrder = 'asc';
+                        }
+                        fetchMembers();
+                    }
+                });
+            } catch(e) {
+                document.getElementById('members-table-container').innerHTML = `<div style="text-align: center; color: var(--color-critical); padding: 20px;">Failed to load members: ${e.message}</div>`;
+            }
+        }
+
+        function triggerSearch() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                currentPage = 1;
+                fetchMembers();
+            }, 300);
+        }
+
+        function triggerFilters() {
+            currentPage = 1;
+            fetchMembers();
+        }
+
+        function changePage(delta) {
+            currentPage += delta;
+            fetchMembers();
+        }
+
+        function clearFilters() {
+            document.getElementById('filter-search').value = '';
+            document.getElementById('filter-skill').value = '';
+            document.getElementById('filter-avail').value = '';
+            currentPage = 1;
+            fetchMembers();
+        }
+    </script>
+</body>
+</html>

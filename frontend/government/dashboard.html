@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Government Dashboard — Disaster Shield AI</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header class="app-navbar"></header>
+    
+    <div class="portal-layout">
+        <aside class="sidebar"></aside>
+        
+        <main class="portal-content">
+            <div style="margin-bottom: 20px;">
+                <h2 style="font-size: 24px; font-weight: 800;">Command Center Overview</h2>
+                <p style="color: var(--text-secondary); font-size: 13px;">Review city-wide status totals, resource deficits, and NGO dispatch logs in real time.</p>
+            </div>
+
+            <!-- KPI Card Grid -->
+            <div class="shared-grid" style="margin-bottom: 24px;" id="kpi-panel">
+                <div class="glass-panel" style="border-top: 4px solid var(--color-critical);">
+                    <div style="font-size: 11px; color: var(--text-secondary); font-weight:700; text-transform:uppercase;">Active SOS Requests</div>
+                    <div style="font-size: 28px; font-weight: 800; margin: 4px 0;" id="kpi-sos">0</div>
+                </div>
+                <div class="glass-panel" style="border-top: 4px solid var(--color-medium);">
+                    <div style="font-size: 11px; color: var(--text-secondary); font-weight:700; text-transform:uppercase;">Active Alerts</div>
+                    <div style="font-size: 28px; font-weight: 800; margin: 4px 0;" id="kpi-alerts">0</div>
+                </div>
+                <div class="glass-panel" style="border-top: 4px solid var(--color-low);">
+                    <div style="font-size: 11px; color: var(--text-secondary); font-weight:700; text-transform:uppercase;">Verified NGOs</div>
+                    <div style="font-size: 28px; font-weight: 800; margin: 4px 0;" id="kpi-ngos">0</div>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px;">
+                <!-- Left: Critical Regions List -->
+                <div class="glass-panel" style="display: flex; flex-direction: column;">
+                    <h3 style="font-size: 15px; margin-bottom: 12px; font-weight: 700; border-bottom: 1.5px solid var(--border-color); padding-bottom: 8px;">
+                        <i class="fa-solid fa-triangle-exclamation" style="color: var(--color-critical);"></i> Most Affected Sectors
+                    </h3>
+                    <div id="impact-table-container">
+                        <div style="text-align: center; color: var(--text-muted); padding: 40px;">Compiling regional metrics...</div>
+                    </div>
+                </div>
+
+                <!-- Right: Food & Shelter occupancy -->
+                <div style="display: flex; flex-direction: column; gap: 20px;">
+                    <div class="glass-panel">
+                        <h3 style="font-size: 15px; margin-bottom: 12px; font-weight: 700;"><i class="fa-solid fa-tents"></i> Shelter Occupancy Status</h3>
+                        <div id="shelter-occupancy-list" style="display:flex; flex-direction:column; gap:10px;">
+                            <div style="text-align: center; color: var(--text-muted); padding: 20px;">Checking occupancy...</div>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel">
+                        <h3 style="font-size: 15px; margin-bottom: 12px; font-weight: 700;"><i class="fa-solid fa-wheat-awn"></i> Food Inventory Margin</h3>
+                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px;">
+                            <div><b>Surplus Available:</b> <span id="food-avail">0</span> packs</div>
+                            <div><b>Required Deficit:</b> <span id="food-req" style="color: var(--color-critical); font-weight:700;">0</span> packs</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'gov') {
+                window.location.href = '/login.html?role=gov';
+                return;
+            }
+            
+            components.renderNavbar("Command Center Dashboard");
+            components.renderSidebar("/government/dashboard.html");
+            
+            await loadGovDashboard();
+        });
+
+        async function loadGovDashboard() {
+            try {
+                // 1. Fetch dashboard KPIs
+                const kpis = await api.request('/api/gov/dashboard');
+                document.getElementById('kpi-sos').innerText = kpis.sos_stats.pending + kpis.sos_stats.assigned + kpis.sos_stats.in_progress;
+                document.getElementById('kpi-alerts').innerText = kpis.active_alerts_count;
+                document.getElementById('kpi-ngos').innerText = kpis.ngo_stats.verified;
+                
+                // 2. Fetch analytics overview
+                const analytics = await api.request('/api/gov/analytics/overview');
+                
+                // Load regional impact table
+                const container = document.getElementById('impact-table-container');
+                container.innerHTML = '';
+                
+                const cols = [
+                    { title: "Sector Region", field: "area_name", render: (val) => `<b>${val}</b>` },
+                    { title: "Risk Level", field: "risk_level", render: (val) => {
+                        let color = 'var(--color-low)';
+                        if (val === 'Critical') color = 'var(--color-critical)';
+                        else if (val === 'High') color = 'var(--color-high)';
+                        else if (val === 'Medium') color = 'var(--color-medium)';
+                        return `<span style="color:${color}; font-weight:700;">${val.toUpperCase()}</span>`;
+                    }},
+                    { title: "Active SOS", field: "sos_count", render: (val) => `<span style="color:var(--color-critical); font-weight:800;">${val} SOS</span>` }
+                ];
+                
+                components.renderDataTable('impact-table-container', cols, analytics.regional_impact.slice(0, 5));
+                
+                // Load shelter occupancy list
+                const sContainer = document.getElementById('shelter-occupancy-list');
+                sContainer.innerHTML = '';
+                
+                analytics.shelters.slice(0, 3).forEach(s => {
+                    const row = document.createElement('div');
+                    row.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; font-weight:600;">
+                            <span>${s.name}</span>
+                            <span>${s.occupancy} / ${s.capacity} beds</span>
+                        </div>
+                        <div style="background:#E2E8F0; height:8px; border-radius:4px; overflow:hidden;">
+                            <div style="background:var(--color-primary-light); width:${s.utilization_pct}%; height:100%; border-radius:4px;"></div>
+                        </div>
+                    `;
+                    sContainer.appendChild(row);
+                });
+                
+                // Load food summary
+                document.getElementById('food-avail').innerText = analytics.food_summary.total_available;
+                document.getElementById('food-req').innerText = analytics.food_summary.total_required;
+            } catch(e) {
+                console.error(e);
+            }
+        }
+    </script>
+</body>
+</html>

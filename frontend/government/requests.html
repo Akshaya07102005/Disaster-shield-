@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emergency Requests — Government Portal</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header class="app-navbar"></header>
+    
+    <div class="portal-layout">
+        <aside class="sidebar"></aside>
+        
+        <main class="portal-content">
+            <div style="margin-bottom: 20px;">
+                <h2 style="font-size: 24px; font-weight: 800;">Emergency Requests Queue</h2>
+                <p style="color: var(--text-secondary); font-size: 13px;">Manage citizen rescue demands, audit priority triage scores, and delegate dispatches to NGOs.</p>
+            </div>
+
+            <!-- Filters -->
+            <div class="glass-panel" style="padding:16px; margin-bottom:20px;">
+                <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
+                    <div class="form-group" style="margin-bottom:0; flex:1; min-width:180px;">
+                        <label class="form-label" style="font-size:10px;">Filter Status</label>
+                        <select class="form-control" id="filter-status" onchange="loadRequests()" style="padding:8px 12px; font-size:12px;">
+                            <option value="">All Statuses</option>
+                            <option value="pending">Pending</option>
+                            <option value="assigned">Assigned</option>
+                            <option value="in-progress">In-Progress</option>
+                            <option value="resolved">Resolved</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0; flex:1; min-width:180px;">
+                        <label class="form-label" style="font-size:10px;">Filter Disaster</label>
+                        <select class="form-control" id="filter-type" onchange="loadRequests()" style="padding:8px 12px; font-size:12px;">
+                            <option value="">All Hazards</option>
+                            <option value="Flood">Flood</option>
+                            <option value="Cyclone">Cyclone</option>
+                            <option value="Medical">Medical</option>
+                            <option value="Trapped">Trapped</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-panel" style="padding:20px;">
+                <div id="requests-table-container">
+                    <div style="text-align: center; color: var(--text-muted); padding: 40px;">
+                        <i class="fa-solid fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 10px;"></i>
+                        <p>Loading emergency queue...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Assignment Modal -->
+    <div id="assign-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.4); z-index: 10000; align-items: center; justify-content: center; padding: 20px;">
+        <div class="glass-panel" style="width: 100%; max-width: 420px; padding: 24px;">
+            <h3 style="margin-bottom: 16px;"><i class="fa-solid fa-people-carry-box"></i> Dispatch NGO Assignment</h3>
+            <form onsubmit="handleDispatchNgo(event)">
+                <input type="hidden" id="assign-sos-id">
+                <div class="form-group">
+                    <label class="form-label">Select Verified NGO</label>
+                    <select class="form-control" id="assign-ngo-select" required>
+                        <option value="">Select NGO...</option>
+                    </select>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button class="btn btn-primary" type="submit">Confirm Dispatch</button>
+                    <button class="btn btn-secondary" type="button" onclick="closeAssignModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+        let requestsList = [];
+        let ngosList = [];
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'gov') {
+                window.location.href = '/login.html?role=gov';
+                return;
+            }
+            
+            components.renderNavbar("Emergency Requests");
+            components.renderSidebar("/government/requests.html");
+            
+            await loadNGOs();
+            await loadRequests();
+        });
+
+        async function loadNGOs() {
+            try {
+                const list = await api.request('/api/gov/ngos');
+                ngosList = list.filter(n => n.verified);
+                
+                const sel = document.getElementById('assign-ngo-select');
+                sel.innerHTML = '<option value="">Select NGO...</option>';
+                ngosList.forEach(n => {
+                    const opt = document.createElement('option');
+                    opt.value = n.id;
+                    opt.innerText = `${n.org_name} (Capacity: ${n.capacity})`;
+                    sel.appendChild(opt);
+                });
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        async function loadRequests() {
+            try {
+                const list = await api.request('/api/gov/sos');
+                requestsList = list;
+                
+                const filterStatus = document.getElementById('filter-status').value;
+                const filterType = document.getElementById('filter-type').value;
+                
+                let filtered = list;
+                if (filterStatus) filtered = filtered.filter(r => r.status === filterStatus);
+                if (filterType) filtered = filtered.filter(r => r.emergency_type === filterType);
+                
+                const cols = [
+                    { title: "ID", field: "id", render: (val) => `<b>#${val}</b>` },
+                    { title: "Citizen", field: "citizen_name", render: (val, row) => `<b>${val}</b><br/><span style="font-size:10px; color:var(--text-muted);">${row.citizen_phone}</span>` },
+                    { title: "Sector Area", field: "area_name" },
+                    { title: "Hazard Type", field: "emergency_type" },
+                    { title: "Affected", field: "people_affected", render: (val) => `${val} citizen(s)` },
+                    { title: "Priority Score", field: "priority_score", render: (val) => {
+                        let color = 'var(--color-low)';
+                        if (val >= 25.0) color = 'var(--color-critical)';
+                        else if (val >= 15.0) color = 'var(--color-high)';
+                        else if (val >= 5.0) color = 'var(--color-medium)';
+                        return `<span style="color:${color}; font-weight:800;">${val.toFixed(1)}</span>`;
+                    }},
+                    { title: "Status", field: "status", render: (val) => {
+                        let badgeClass = 'role-citizen';
+                        if (val === 'pending') badgeClass = 'role-gov';
+                        else if (val === 'resolved') badgeClass = 'role-citizen';
+                        else badgeClass = 'role-ngo';
+                        return `<span class="user-badge ${badgeClass}">${val.toUpperCase()}</span>`;
+                    }},
+                    { title: "Dispatch Action", field: "id", render: (val, row) => {
+                        if (row.status === 'pending') {
+                            return `<button class="btn btn-primary" onclick="openAssignModal(${val})" style="padding: 4px 8px; font-size:11px; width:auto; border-radius:4px;"><i class="fa-solid fa-people-carry-box"></i> Assign NGO</button>`;
+                        }
+                        return `<span style="font-size:11px; color:var(--text-muted); font-style:italic;">Dispatched</span>`;
+                    }}
+                ];
+                
+                components.renderDataTable('requests-table-container', cols, filtered);
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        function openAssignModal(sosId) {
+            document.getElementById('assign-sos-id').value = sosId;
+            document.getElementById('assign-modal').style.display = 'flex';
+        }
+
+        function closeAssignModal() {
+            document.getElementById('assign-modal').style.display = 'none';
+        }
+
+        async function handleDispatchNgo(e) {
+            e.preventDefault();
+            const sosId = document.getElementById('assign-sos-id').value;
+            const ngoId = document.getElementById('assign-ngo-select').value;
+            
+            try {
+                await api.request(`/api/gov/sos/${sosId}/assign`, {
+                    method: 'POST',
+                    body: JSON.stringify({ ngo_id: parseInt(ngoId) })
+                });
+                closeAssignModal();
+                alert(`Successfully assigned SOS request #${sosId} to NGO.`);
+                await loadRequests();
+            } catch(e) {
+                alert(`Assignment failed: ${e.message}`);
+            }
+        }
+    </script>
+</body>
+</html>

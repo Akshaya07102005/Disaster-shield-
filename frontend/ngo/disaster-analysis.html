@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disaster Severity Analysis — NGO Portal</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header class="app-navbar"></header>
+    
+    <div class="portal-layout">
+        <aside class="sidebar"></aside>
+        
+        <main class="portal-content">
+            <div style="margin-bottom: 20px;">
+                <h2 style="font-size: 24px; font-weight: 800;">Disaster Severity Analysis</h2>
+                <p style="color: var(--text-secondary); font-size: 13px;">Review aggregate severity indicators, risk priority scales, and distribution ratios city-wide.</p>
+            </div>
+
+            <!-- Two Columns for Charts -->
+            <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 20px; margin-bottom: 20px;">
+                <!-- Chart 1: Priority Distribution Bar Chart -->
+                <div class="glass-panel" style="padding: 20px;">
+                    <h3 style="font-size: 15px; margin-bottom: 16px; font-weight: 700;">Active Cases by Criticality Triage</h3>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 16px;" id="criticality-bars">
+                        <!-- Bars dynamically rendered -->
+                        <div style="text-align: center; color: var(--text-muted); padding: 40px;">Loading metrics...</div>
+                    </div>
+                </div>
+
+                <!-- Chart 2: Category Breakdown Table/Ratios -->
+                <div class="glass-panel" style="padding: 20px;">
+                    <h3 style="font-size: 15px; margin-bottom: 16px; font-weight: 700;">Hazards Incident Breakdown</h3>
+                    
+                    <div id="types-table-container">
+                        <div style="text-align: center; color: var(--text-muted); padding: 40px;">Loading metrics...</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'ngo') {
+                window.location.href = '/login.html?role=ngo';
+                return;
+            }
+            
+            components.renderNavbar("Disaster Analysis");
+            components.renderSidebar("/ngo/disaster-analysis.html");
+            
+            await loadAnalysis();
+        });
+
+        async function loadAnalysis() {
+            try {
+                const data = await api.request('/api/ngo/analysis/disasters');
+                
+                // 1. Render criticality bars
+                const cContainer = document.getElementById('criticality-bars');
+                cContainer.innerHTML = '';
+                
+                const pb = data.priority_breakdown;
+                const maxVal = Math.max(1, pb.critical, pb.high, pb.medium, pb.low);
+                
+                const priorities = [
+                    { label: "Critical Priority", count: pb.critical, color: "var(--color-critical)", pct: (pb.critical / maxVal) * 100 },
+                    { label: "High Priority", count: pb.high, color: "var(--color-high)", pct: (pb.high / maxVal) * 100 },
+                    { label: "Medium Priority", count: pb.medium, color: "var(--color-medium)", pct: (pb.medium / maxVal) * 100 },
+                    { label: "Low Priority", count: pb.low, color: "var(--color-low)", pct: (pb.low / maxVal) * 100 }
+                ];
+                
+                priorities.forEach(p => {
+                    const row = document.createElement('div');
+                    row.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom: 4px; font-weight:600;">
+                            <span>${p.label}</span>
+                            <span>${p.count} Active SOS</span>
+                        </div>
+                        <div style="background:#E2E8F0; height:12px; border-radius:6px; overflow:hidden; width:100%;">
+                            <div style="background:${p.color}; width:${p.pct}%; height:100%; border-radius:6px; transition: width 0.8s ease;"></div>
+                        </div>
+                    `;
+                    cContainer.appendChild(row);
+                });
+                
+                // 2. Render Incident Types breakdown
+                const tContainer = document.getElementById('types-table-container');
+                tContainer.innerHTML = '';
+                
+                const types = Object.entries(data.types_breakdown);
+                
+                if (types.length === 0) {
+                    tContainer.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--text-secondary);">No distress incidents reported in mapped sectors.</div>`;
+                    return;
+                }
+                
+                const tableRows = types.map(([type, count]) => {
+                    const pctOfTotal = ((count / data.total_sos_requests) * 100).toFixed(0);
+                    return `
+                        <tr>
+                            <td style="font-weight:700;">${type}</td>
+                            <td>${count} Incidents</td>
+                            <td>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <div style="background:#E2E8F0; height:8px; border-radius:4px; flex:1; width:80px;">
+                                        <div style="background:var(--color-primary-light); height:100%; width:${pctOfTotal}%; border-radius:4px;"></div>
+                                    </div>
+                                    <span style="font-size:11px; font-weight:700; width:30px;">${pctOfTotal}%</span>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+                
+                tContainer.innerHTML = `
+                    <div class="table-container">
+                        <table class="datatable">
+                            <thead>
+                                <tr>
+                                    <th>Incident Category</th>
+                                    <th>Volume</th>
+                                    <th>Density Ratio</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${tableRows}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            } catch(e) {
+                console.error(e);
+            }
+        }
+    </script>
+</body>
+</html>

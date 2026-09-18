@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resource Allocation Advisor — NGO Portal</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header class="app-navbar"></header>
+    
+    <div class="portal-layout">
+        <aside class="sidebar"></aside>
+        
+        <main class="portal-content">
+            <div style="margin-bottom: 20px; max-width: 700px;">
+                <h2 style="font-size: 24px; font-weight: 800;">Resource Allocation Advisor</h2>
+                <p style="color: var(--text-secondary); font-size: 13px;">Select an active emergency request to trigger the allocation checklist generator. These metrics serve as dispatcher decision support.</p>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1.3fr; gap: 20px; align-items: flex-start; max-width: 1000px;">
+                <!-- Left: Selector -->
+                <div class="glass-panel" style="padding: 20px;">
+                    <h3 style="font-size:15px; margin-bottom: 12px; font-weight: 700;">Select Active Request</h3>
+                    <div class="form-group">
+                        <select class="form-control" id="sos-select" onchange="loadRecommendation(this.value)" style="padding:10px; font-size:13px;">
+                            <option value="">Choose SOS alert...</option>
+                        </select>
+                    </div>
+                    <div id="sos-preview-box" style="margin-top: 15px; font-size: 12px; line-height: 1.45; color: var(--text-secondary); display: none;">
+                        <h4 style="color: var(--color-primary); font-size: 13px; margin-bottom: 6px;">SOS Request Summary</h4>
+                        <div><b>Sector:</b> <span id="preview-area"></span></div>
+                        <div><b>Headcount:</b> <span id="preview-people"></span> citizen(s)</div>
+                        <div><b>Disaster Type:</b> <span id="preview-type"></span></div>
+                        <div style="margin-top: 8px; font-style: italic; background: #F8FAFC; padding: 8px; border-radius: 4px;" id="preview-desc"></div>
+                    </div>
+                </div>
+
+                <!-- Right: Recommendation Panel -->
+                <div class="glass-panel" id="rec-panel" style="padding: 20px; display: none;">
+                    <h3 style="font-size: 15px; margin-bottom: 8px; font-weight: 700;"><i class="fa-solid fa-wand-magic-sparkles" style="color: var(--color-info);"></i> Suggested Allocation Model</h3>
+                    <div class="ai-warning-label"><i class="fa-solid fa-circle-info"></i> AI Recommendation — Human Verification Required before finalizing squad dispatches.</div>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 12px; font-size: 13px; margin-top: 15px;">
+                        <div><b>Recommended Team Size:</b> <span id="rec-team-size" style="font-weight: 800; color: var(--color-primary);"></span> volunteers</div>
+                        <div><b>Required Field Skills:</b> <span id="rec-skills" style="text-transform: uppercase; font-weight: 700; color: var(--color-primary-light);"></span></div>
+                        <div><b>Recommended Vehicles:</b> <span id="rec-vehicles" style="font-weight:700;"></span></div>
+                        <div><b>Dry Food / Water Packs:</b> <span id="rec-food" style="font-weight: 700;"></span> kits</div>
+                        
+                        <div style="margin-top: 8px;">
+                            <b>Required Equipment Checklist:</b>
+                            <ul style="padding-left: 20px; margin-top: 6px; line-height: 1.45; font-size:12px; color: var(--text-secondary);" id="rec-equipment"></ul>
+                        </div>
+                        
+                        <div style="margin-top: 8px; background: rgba(59, 130, 246, 0.05); padding: 10px; border-left: 3px solid var(--color-info); border-radius: 2px; font-size: 12px; line-height:1.45; color: var(--text-secondary);" id="rec-reasoning"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+        let loadedMissions = [];
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'ngo') {
+                window.location.href = '/login.html?role=ngo';
+                return;
+            }
+            
+            components.renderNavbar("Resource Advisor");
+            components.renderSidebar("/ngo/resources.html");
+            
+            await loadActiveRequests();
+        });
+
+        async function loadActiveRequests() {
+            try {
+                const list = await api.request('/api/ngo/missions');
+                loadedMissions = list.filter(m => m.status !== 'completed');
+                
+                const sel = document.getElementById('sos-select');
+                sel.innerHTML = '<option value="">Choose SOS alert...</option>';
+                
+                loadedMissions.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m.sos_request_id;
+                    opt.innerText = `SOS #${m.sos_request_id} - ${m.sos_details.emergency_type} in ${m.sos_details.area_name}`;
+                    sel.appendChild(opt);
+                });
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        async function loadRecommendation(sosId) {
+            const previewBox = document.getElementById('sos-preview-box');
+            const recPanel = document.getElementById('rec-panel');
+            
+            if (!sosId) {
+                previewBox.style.display = 'none';
+                recPanel.style.display = 'none';
+                return;
+            }
+            
+            // Show preview
+            const mission = loadedMissions.find(m => m.sos_request_id == sosId);
+            if (mission) {
+                document.getElementById('preview-area').innerText = mission.sos_details.area_name;
+                document.getElementById('preview-people').innerText = mission.sos_details.people_affected;
+                document.getElementById('preview-type').innerText = mission.sos_details.emergency_type;
+                document.getElementById('preview-desc').innerText = `"${mission.sos_details.description || 'No description'}"`;
+                previewBox.style.display = 'block';
+            }
+            
+            try {
+                const rec = await api.request('/api/ngo/ai/recommend-resources', {
+                    method: 'POST',
+                    body: JSON.stringify({ sos_id: parseInt(sosId) })
+                });
+                
+                document.getElementById('rec-team-size').innerText = rec.suggested_team_size;
+                document.getElementById('rec-skills').innerText = rec.suggested_skills.join(', ');
+                document.getElementById('rec-vehicles').innerText = rec.suggested_vehicles;
+                document.getElementById('rec-food').innerText = rec.suggested_food_water_pack;
+                
+                const eqList = document.getElementById('rec-equipment');
+                eqList.innerHTML = '';
+                rec.suggested_equipment.forEach(eq => {
+                    const li = document.createElement('li');
+                    li.innerText = eq;
+                    eqList.appendChild(li);
+                });
+                
+                document.getElementById('rec-reasoning').innerText = rec.reasoning;
+                recPanel.style.display = 'block';
+            } catch(e) {
+                alert(`Failed to fetch recommendations: ${e.message}`);
+            }
+        }
+    </script>
+</body>
+</html>

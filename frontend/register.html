@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disaster Shield AI — Register Account</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="auth-wrapper" style="font-family: 'Inter', sans-serif;">
+    
+    <div class="glass-panel auth-card" style="box-shadow: var(--shadow-lg); border-top: 5px solid var(--color-success); max-width: 500px;">
+        <div class="auth-header">
+            <div class="auth-logo" onclick="window.location.href='/'" style="cursor: pointer;">
+                <i class="fa-solid fa-shield-halved" style="color: var(--color-success);"></i> DISASTER SHIELD AI
+            </div>
+            <div class="auth-subtitle">New Emergency Responder & Citizen Registration</div>
+        </div>
+
+        <!-- Registration Role Tabs -->
+        <div class="auth-tabs" style="margin-bottom: 20px;">
+            <div class="auth-tab active" id="tab-citizen" onclick="switchRegRole('citizen')">Citizen Registration</div>
+            <div class="auth-tab" id="tab-ngo" onclick="switchRegRole('ngo')">NGO Fleet Registration</div>
+        </div>
+
+        <!-- Citizen Form -->
+        <form id="form-register-citizen" onsubmit="handleCitizenRegister(event)">
+            <div class="form-group">
+                <label class="form-label" for="citizen-name">Full Name</label>
+                <input class="form-control" type="text" id="citizen-name" required placeholder="E.g., Vijay Nathan" style="padding: 8px 12px; font-size:12px;">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="citizen-email">Email Address</label>
+                <input class="form-control" type="email" id="citizen-email" required placeholder="E.g., vijay@test.com" style="padding: 8px 12px; font-size:12px;">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="citizen-phone">Phone Number (OTP Verification Required)</label>
+                <div style="display: flex; gap: 8px;">
+                    <input class="form-control" type="tel" id="citizen-phone" required placeholder="E.g., 9988112233" style="padding: 8px 12px; font-size:12px; flex:1;">
+                    <button class="btn btn-secondary" type="button" onclick="verifyOtpMock()" id="btn-otp-verify" style="width: auto; font-size: 11px; padding: 0 12px;">Verify</button>
+                </div>
+                <div id="otp-status" style="font-size: 10px; color: var(--color-success); margin-top: 4px; display: none;">
+                    <i class="fa-solid fa-circle-check"></i> Phone verified via mock SMS OTP.
+                </div>
+            </div>
+
+            <!-- Area Selector -->
+            <div class="form-group">
+                <label class="form-label" for="citizen-area">Home Area (Chennai Mapped Sector)</label>
+                <select class="form-control" id="citizen-area" required style="padding: 8px 12px; font-size:12px;">
+                    <option value="">Loading areas...</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="citizen-password">Secure Password</label>
+                <input class="form-control" type="password" id="citizen-password" required placeholder="••••••••" style="padding: 8px 12px; font-size:12px;">
+            </div>
+
+            <button class="btn btn-success" type="submit" style="margin-top: 10px; padding: 12px; font-weight:700;">
+                <i class="fa-solid fa-user-plus"></i> Create Citizen Account
+            </button>
+        </form>
+
+        <!-- NGO Form -->
+        <form id="form-register-ngo" onsubmit="handleNgoRegister(event)" style="display: none;">
+            <div class="form-group">
+                <label class="form-label" for="ngo-name">Organization Name</label>
+                <input class="form-control" type="text" id="ngo-name" required placeholder="E.g., Chennai Rescue Force" style="padding: 8px 12px; font-size:12px;">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="ngo-reg-number">Government Registration Number</label>
+                <input class="form-control" type="text" id="ngo-reg-number" required placeholder="E.g., NGO/2026/CH/123" style="padding: 8px 12px; font-size:12px;">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="ngo-contact-person">Contact Person Name</label>
+                <input class="form-control" type="text" id="ngo-contact-person" required placeholder="E.g., Anand Raghavan" style="padding: 8px 12px; font-size:12px;">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="form-group">
+                    <label class="form-label" for="ngo-email">Contact Email</label>
+                    <input class="form-control" type="email" id="ngo-email" required placeholder="E.g., team@ngo.org" style="padding: 8px 12px; font-size:12px;">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="ngo-phone">Contact Phone</label>
+                    <input class="form-control" type="tel" id="ngo-phone" required placeholder="E.g., 9944112233" style="padding: 8px 12px; font-size:12px;">
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 12px;">
+                <div class="form-group">
+                    <label class="form-label" for="ngo-password">Password</label>
+                    <input class="form-control" type="password" id="ngo-password" required placeholder="••••••••" style="padding: 8px 12px; font-size:12px;">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="ngo-capacity">Rescue Squad Capacity</label>
+                    <input class="form-control" type="number" id="ngo-capacity" min="1" value="5" style="padding: 8px 12px; font-size:12px;">
+                </div>
+            </div>
+
+            <!-- NGO Approval Alert Notice -->
+            <div style="background: rgba(245, 158, 11, 0.05); border: 1.5px solid rgba(245,158,11,0.25); padding: 10px; border-radius: 4px; font-size: 11px; color: var(--color-medium); margin-bottom: 12px; line-height: 1.45;">
+                <i class="fa-solid fa-circle-info"></i> <b>Verification Required:</b> Registered NGO profiles must be audited and verified by government commanders before accepting dispatches.
+            </div>
+
+            <button class="btn btn-success" type="submit" style="margin-top: 10px; padding: 12px; font-weight:700;">
+                <i class="fa-solid fa-paper-plane"></i> Submit Registration Proposal
+            </button>
+        </form>
+
+        <!-- Feedback Messages -->
+        <div id="register-error" style="color: var(--color-critical); font-size: 12px; margin-top: 12px; text-align: center; display: none; font-weight: 600;"></div>
+        <div id="register-success" style="color: var(--color-success); font-size: 12px; margin-top: 12px; text-align: center; display: none; font-weight: 700; border: 1.5px solid var(--color-success); padding: 10px; border-radius:4px; background: rgba(16, 185, 129, 0.05); line-height:1.45;"></div>
+
+        <div style="margin-top: 20px; text-align: center; font-size: 13px; color: var(--text-secondary);">
+            Already have an account? <a href="/login.html" style="color: var(--color-primary-light); font-weight:700; text-decoration:none;">Sign in here</a>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script>
+        let currentRegRole = 'citizen';
+        let isOtpVerified = false;
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            await populateAreas();
+        });
+
+        async function populateAreas() {
+            try {
+                const list = await api.request('/api/public/areas');
+                const sel = document.getElementById('citizen-area');
+                sel.innerHTML = '<option value="">Select Home Sector...</option>';
+                
+                list.forEach(a => {
+                    const opt = document.createElement('option');
+                    opt.value = a.id;
+                    opt.innerText = `${a.area_name} (${a.zone})`;
+                    sel.appendChild(opt);
+                });
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        function switchRegRole(role) {
+            currentRegRole = role;
+            
+            document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(`tab-${role}`).classList.add('active');
+
+            const citizenForm = document.getElementById('form-register-citizen');
+            const ngoForm = document.getElementById('form-register-ngo');
+            
+            if (role === 'citizen') {
+                citizenForm.style.display = 'block';
+                ngoForm.style.display = 'none';
+            } else {
+                citizenForm.style.display = 'none';
+                ngoForm.style.display = 'block';
+            }
+            
+            document.getElementById('register-error').style.display = 'none';
+            document.getElementById('register-success').style.display = 'none';
+        }
+
+        function verifyOtpMock() {
+            const phone = document.getElementById('citizen-phone').value;
+            if (!phone) {
+                alert("Please enter a valid phone number first.");
+                return;
+            }
+            document.getElementById('btn-otp-verify').disabled = true;
+            document.getElementById('btn-otp-verify').innerText = "Verified";
+            document.getElementById('otp-status').style.display = 'block';
+            isOtpVerified = true;
+        }
+
+        async function handleCitizenRegister(e) {
+            e.preventDefault();
+            const name = document.getElementById('citizen-name').value.trim();
+            const email = document.getElementById('citizen-email').value.trim();
+            const phone = document.getElementById('citizen-phone').value.trim();
+            const home_area_id = document.getElementById('citizen-area').value;
+            const password = document.getElementById('citizen-password').value;
+            
+            const errorDiv = document.getElementById('register-error');
+            const successDiv = document.getElementById('register-success');
+            
+            errorDiv.style.display = 'none';
+            successDiv.style.display = 'none';
+            
+            if (!isOtpVerified) {
+                errorDiv.innerText = "Please complete phone OTP verification first.";
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            try {
+                await api.register({
+                    name, email, phone, password, role: 'citizen',
+                    home_area_id: home_area_id ? parseInt(home_area_id) : null
+                });
+                
+                successDiv.innerHTML = `<i class="fa-solid fa-circle-check"></i> Citizen account created successfully!<br/>Redirecting to sign-in...`;
+                successDiv.style.display = 'block';
+                
+                setTimeout(() => {
+                    window.location.href = `/login.html?role=citizen`;
+                }, 2000);
+            } catch(error) {
+                errorDiv.innerText = error.message || "Registration failed. Email or phone may already be registered.";
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        async function handleNgoRegister(e) {
+            e.preventDefault();
+            const name = document.getElementById('ngo-contact-person').value.trim();
+            const org_name = document.getElementById('ngo-name').value.trim();
+            const registration_number = document.getElementById('ngo-reg-number').value.trim();
+            const email = document.getElementById('ngo-email').value.trim();
+            const phone = document.getElementById('ngo-phone').value.trim();
+            const password = document.getElementById('ngo-password').value;
+            const capacity = parseInt(document.getElementById('ngo-capacity').value);
+            
+            const errorDiv = document.getElementById('register-error');
+            const successDiv = document.getElementById('register-success');
+            
+            errorDiv.style.display = 'none';
+            successDiv.style.display = 'none';
+            
+            try {
+                await api.register({
+                    name, email, phone, password, role: 'ngo',
+                    org_name, registration_number, capacity
+                });
+                
+                successDiv.innerHTML = `<i class="fa-solid fa-paper-plane"></i> NGO proposal submitted successfully!<br/><span style="font-size:10px; color:var(--text-secondary);">Your account is currently pending Government verification review. Access will be unlocked on approval.</span>`;
+                successDiv.style.display = 'block';
+                
+                // Reset inputs
+                document.getElementById('ngo-name').value = '';
+                document.getElementById('ngo-reg-number').value = '';
+                document.getElementById('ngo-contact-person').value = '';
+                document.getElementById('ngo-email').value = '';
+                document.getElementById('ngo-phone').value = '';
+            } catch(error) {
+                errorDiv.innerText = error.message || "Failed to submit proposal. registration number may already exist.";
+                errorDiv.style.display = 'block';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Management — NGO Portal</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header class="app-navbar"></header>
+    
+    <div class="portal-layout">
+        <aside class="sidebar"></aside>
+        
+        <main class="portal-content">
+            <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <h2 style="font-size: 24px; font-weight: 800;">Rescue Team Formations</h2>
+                    <p style="color: var(--text-secondary); font-size: 13px;">Monitor active squads and assign available volunteers to rescue teams.</p>
+                </div>
+                <button class="btn btn-primary" onclick="openCreateTeamModal()" style="width: auto; font-weight:700;">
+                    <i class="fa-solid fa-plus"></i> Form New Squad
+                </button>
+            </div>
+
+            <!-- Two-Column Layout -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <!-- Left: Active Squads -->
+                <div class="glass-panel" style="display: flex; flex-direction: column;">
+                    <h3 style="font-size: 15px; margin-bottom: 12px; font-weight:700; border-bottom: 1.5px solid var(--border-color); padding-bottom: 8px;">
+                        <i class="fa-solid fa-people-group" style="color: var(--color-primary-light);"></i> Active Squads
+                    </h3>
+                    <div id="teams-list" style="flex:1; display:flex; flex-direction:column; gap:12px;">
+                        <div style="text-align: center; color: var(--text-secondary); padding: 30px;">
+                            <i class="fa-solid fa-spinner fa-spin" style="font-size: 20px; margin-bottom: 8px;"></i>
+                            <p>Loading response squads...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Assign Members Widget -->
+                <div class="glass-panel" style="display: flex; flex-direction: column;">
+                    <h3 style="font-size: 15px; margin-bottom: 12px; font-weight:700; border-bottom: 1.5px solid var(--border-color); padding-bottom: 8px;">
+                        <i class="fa-solid fa-user-plus" style="color: var(--color-success);"></i> Assign Members to Squad
+                    </h3>
+                    <form id="form-assign-members" onsubmit="handleAssignMembers(event)">
+                        <div class="form-group">
+                            <label class="form-label" for="assign-team-select">Select Target Squad</label>
+                            <select class="form-control" id="assign-team-select" required>
+                                <option value="">Select squad...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="assign-member-list">Select Available Volunteers (Multiselect)</label>
+                            <select class="form-control" id="assign-member-list" multiple required style="height: 180px;">
+                                <option value="">Loading available volunteers...</option>
+                            </select>
+                            <span style="font-size: 10px; color: var(--text-muted); display: block; margin-top: 4px;">Hold Ctrl to select multiple members. Only volunteers marked 'Available' are shown.</span>
+                        </div>
+                        
+                        <button class="btn btn-success" type="submit" style="padding: 12px; font-weight:700;">
+                            <i class="fa-solid fa-circle-check"></i> Complete Assignment
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Create Team Modal -->
+    <div id="create-team-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.4); z-index: 10000; align-items: center; justify-content: center; padding: 20px;">
+        <div class="glass-panel" style="width: 100%; max-width: 420px; padding: 24px;">
+            <h3 style="margin-bottom: 16px;"><i class="fa-solid fa-people-group"></i> Form New Response Squad</h3>
+            <form onsubmit="handleCreateTeam(event)">
+                <div class="form-group">
+                    <label class="form-label">Squad Team Name</label>
+                    <input class="form-control" type="text" id="new-team-name" required placeholder="E.g., Chennai North Rescue Force A">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Initial Members Count</label>
+                    <input class="form-control" type="number" id="new-team-members" min="1" value="5">
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button class="btn btn-primary" type="submit">Create Squad</button>
+                    <button class="btn btn-secondary" type="button" onclick="closeCreateTeamModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'ngo') {
+                window.location.href = '/login.html?role=ngo';
+                return;
+            }
+            
+            components.renderNavbar("Team Management");
+            components.renderSidebar("/ngo/teams.html");
+            
+            await refreshTeamsAndVolunteers();
+        });
+
+        async function refreshTeamsAndVolunteers() {
+            try {
+                // 1. Fetch rescue teams
+                const list = await api.request('/api/ngo/teams');
+                const tContainer = document.getElementById('teams-list');
+                const tSelect = document.getElementById('assign-team-select');
+                
+                tContainer.innerHTML = '';
+                tSelect.innerHTML = '<option value="">Select squad...</option>';
+                
+                if (list.length === 0) {
+                    tContainer.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--text-secondary);">No response squads created yet.</div>`;
+                } else {
+                    list.forEach(t => {
+                        const div = document.createElement('div');
+                        div.className = 'glass-panel';
+                        div.style.padding = '12px';
+                        div.style.borderLeft = '4px solid var(--color-primary-light)';
+                        
+                        div.innerHTML = `
+                            <div style="display:flex; justify-content:space-between; margin-bottom: 4px;">
+                                <strong>${t.team_name}</strong>
+                                <span class="user-badge" style="background:rgba(16,185,129,0.06); color:var(--color-low); border-color:transparent; font-size:10px;">${t.status.toUpperCase()}</span>
+                            </div>
+                            <div style="font-size:11px; color: var(--text-secondary);">
+                                <span>Squad Members: ${t.members_count} volunteers</span>
+                            </div>
+                        `;
+                        tContainer.appendChild(div);
+                        
+                        // Option select
+                        const opt = document.createElement('option');
+                        opt.value = t.id;
+                        opt.innerText = t.team_name;
+                        tSelect.appendChild(opt);
+                    });
+                }
+                
+                // 2. Fetch available members (available status only)
+                const membersData = await api.request('/api/ngo/members?availability=available&limit=100');
+                const mSelect = document.getElementById('assign-member-list');
+                mSelect.innerHTML = '';
+                
+                if (membersData.members.length === 0) {
+                    mSelect.innerHTML = '<option value="" disabled>No available volunteers found</option>';
+                } else {
+                    membersData.members.forEach(m => {
+                        const opt = document.createElement('option');
+                        opt.value = m.id;
+                        opt.innerText = `${m.name} (${m.skill}) - ${m.region}`;
+                        mSelect.appendChild(opt);
+                    });
+                }
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        function openCreateTeamModal() {
+            document.getElementById('create-team-modal').style.display = 'flex';
+        }
+
+        function closeCreateTeamModal() {
+            document.getElementById('create-team-modal').style.display = 'none';
+        }
+
+        async function handleCreateTeam(e) {
+            e.preventDefault();
+            const name = document.getElementById('new-team-name').value.trim();
+            const count = parseInt(document.getElementById('new-team-members').value);
+            
+            try {
+                await api.request('/api/ngo/teams', {
+                    method: 'POST',
+                    body: JSON.stringify({ team_name: name, members_count: count })
+                });
+                closeCreateTeamModal();
+                document.getElementById('new-team-name').value = '';
+                await refreshTeamsAndVolunteers();
+            } catch(e) {
+                alert(`Failed to create team: ${e.message}`);
+            }
+        }
+
+        async function handleAssignMembers(e) {
+            e.preventDefault();
+            const teamId = document.getElementById('assign-team-select').value;
+            const mSelect = document.getElementById('assign-member-list');
+            
+            const selectedMemberIds = Array.from(mSelect.selectedOptions).map(opt => parseInt(opt.value));
+            
+            if (selectedMemberIds.length === 0) {
+                alert("Please select at least one available volunteer.");
+                return;
+            }
+            
+            try {
+                await api.request('/api/ngo/members/assign', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        member_ids: selectedMemberIds,
+                        team_id: parseInt(teamId),
+                        action: 'assign'
+                    })
+                });
+                alert(`Successfully assigned ${selectedMemberIds.length} volunteers to the squad.`);
+                await refreshTeamsAndVolunteers();
+            } catch(e) {
+                alert(`Assignment failed: ${e.message}`);
+            }
+        }
+    </script>
+</body>
+</html>

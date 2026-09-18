@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disaster Shield AI — NGO Command Panel</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Leaflet.js -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+</head>
+<body style="background-color: var(--bg-main); color: var(--text-primary); min-height: 100vh;">
+    
+    <header class="app-navbar">
+        <div class="navbar-brand">
+            <i class="fa-solid fa-shield-halved" style="color: var(--color-critical);"></i>
+            <span>DISASTER SHIELD NGO RESPONSE NETWORK</span>
+        </div>
+        <div class="navbar-user">
+            <span class="user-badge" id="ngo-org-name" style="background: rgba(12, 100, 200, 0.15); border-color: rgba(12, 100, 200, 0.3); color: var(--color-primary-light); font-weight:700;">Loading Org...</span>
+            <button class="btn btn-secondary" onclick="api.logout()" style="padding: 6px 12px; width: auto; font-size: 12px;">
+                <i class="fa-solid fa-right-from-bracket"></i> Logout
+            </button>
+        </div>
+    </header>
+
+    <main class="command-grid" style="height: calc(100vh - 100px);">
+        
+        <!-- Left Sidebar: Capacity Meter & Missions Inbox -->
+        <div class="grid-sidebar glass-panel" style="display:flex; flex-direction:column; gap:12px;">
+            <!-- V2 NGO Capacity Workload Meter -->
+            <div style="border-bottom:1.5px solid var(--border-color); padding-bottom: 12px;">
+                <h4 style="font-size: 12px; font-weight:700; color: var(--color-primary); margin-bottom: 6px;">NGO OPERATIONAL WORKLOAD</h4>
+                <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
+                    <span>Active Workload Load</span>
+                    <strong id="ngo-capacity-ratio">0 / 5 concurrent</strong>
+                </div>
+                <div style="width:100%; height:8px; border-radius:4px; background:#E2E8F0; overflow:hidden;">
+                    <div id="ngo-capacity-bar" style="width: 0%; height:100%; background: var(--color-info); transition: var(--transition-smooth);"></div>
+                </div>
+            </div>
+
+            <h3 style="font-size: 15px;"><i class="fa-solid fa-inbox" style="color: var(--color-primary);"></i> Mission Command Inbox</h3>
+            <div class="sos-list" id="ngo-missions-list" style="flex:1; overflow-y:auto;">
+                <div style="text-align: center; color: var(--text-muted); padding: 30px;">
+                    <i class="fa-solid fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 8px;"></i>
+                    <p>Loading assigned missions...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center: Local Sector Map -->
+        <div class="grid-map-container glass-panel" style="padding: 0; overflow: hidden; position: relative; height: 100%;">
+            <div id="map" style="height: 100%;"></div>
+        </div>
+
+        <!-- Right Sidebar: Recommendations, GPS Simulator & Live Mission Chat -->
+        <div class="grid-sidebar" style="gap: 16px; overflow-y:auto; height: 100%;">
+            
+            <!-- AI Resource Recommendation -->
+            <div class="glass-panel" id="ngo-ai-rec-panel" style="display: none; border-color: var(--color-success); padding:16px;">
+                <h3 style="font-size: 14px; margin-bottom: 8px; color: var(--color-success);"><i class="fa-solid fa-robot"></i> AI Rescue Recommendation</h3>
+                <div style="font-size: 11px; line-height: 1.4; color: var(--text-secondary);" id="ai-rec-text">
+                    Select a mission to calculate suggested rescue personnel.
+                </div>
+            </div>
+            
+            <!-- V2 Live GPS Simulator & Route Polyline Trail drawer -->
+            <div class="glass-panel" style="padding: 16px;">
+                <h3 style="margin-bottom: 6px; font-size: 14px;"><i class="fa-solid fa-gauge-high" style="color: var(--color-high);"></i> GPS Simulator & Route Trail</h3>
+                <div style="font-size:11px; color:var(--text-secondary); margin-bottom: 8px;">
+                    Simulate dispatch coordinate trail step updates to victim coordinates.
+                </div>
+                
+                <div class="form-group" style="margin-bottom:8px;">
+                    <label class="form-label" style="font-size:10px;">Select Active Squad</label>
+                    <select class="form-control" id="sim-team-select" style="padding:6px; font-size:11px;"></select>
+                </div>
+                
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                    <button class="btn btn-success" onclick="startGpsSimulation()" id="btn-start-sim" style="font-size:11px; padding:8px;">
+                        <i class="fa-solid fa-play"></i> Start Sim Route
+                    </button>
+                    <button class="btn btn-secondary" onclick="stopGpsSimulation()" id="btn-stop-sim" disabled style="font-size:11px; padding:8px;">
+                        <i class="fa-solid fa-stop"></i> Stop Sim
+                    </button>
+                </div>
+                <div id="sim-status" style="font-size:10px; color:var(--text-muted); margin-top:6px; text-align:center;">
+                    Simulator idle.
+                </div>
+            </div>
+
+            <!-- V2 In-App Dispatch Mission Chat Box -->
+            <div class="glass-panel ai-chat-box" id="mission-chat-panel" style="display: none; padding: 16px; flex-direction: column; min-height: 180px;">
+                <h4 style="font-size: 12px; font-weight:700; color:var(--color-primary); margin-bottom: 6px; display:flex; justify-content:space-between; align-items:center;">
+                    <span><i class="fa-solid fa-comments"></i> In-App Dispatch Chat</span>
+                </h4>
+                <div class="chat-history" id="mission-chat-history" style="flex:1; overflow-y:auto; max-height: 100px; margin-bottom: 8px; border:1px solid var(--border-color); padding: 8px; border-radius:4px; background:#F8FAFC;">
+                    <div style="text-align:center; font-size:10px; color:var(--text-secondary);">Select a mission to begin chat with government command.</div>
+                </div>
+                <div style="display: flex; gap: 4px;">
+                    <input class="form-control" type="text" id="mission-chat-input" placeholder="Type message..." onkeydown="if(event.key === 'Enter') sendMissionMessage()" style="padding: 6px; font-size: 11px;">
+                    <button class="btn btn-primary" onclick="sendMissionMessage()" style="width: auto; padding: 6px 10px;">
+                        <i class="fa-solid fa-paper-plane" style="font-size: 10px;"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Squad Builder -->
+            <div class="glass-panel" style="padding: 16px;">
+                <h3 style="margin-bottom: 8px; font-size: 14px;"><i class="fa-solid fa-people-group" style="color: var(--color-primary-light);"></i> Active Rescue Squads</h3>
+                <div id="ngo-teams-list" style="overflow-y:auto; max-height:100px; margin-bottom:8px; border-bottom:1.5px solid var(--border-color); padding-bottom:6px;"></div>
+                
+                <form onsubmit="handleAddTeam(event)">
+                    <div style="display:grid; grid-template-columns:1fr 80px; gap:8px;">
+                        <input class="form-control" type="text" id="team-name-input" required placeholder="Squad name" style="padding:4px; font-size:11px;">
+                        <input class="form-control" type="number" id="team-members-input" min="2" value="5" style="padding:4px; font-size:11px;">
+                    </div>
+                    <button class="btn btn-primary" type="submit" style="margin-top: 6px; padding: 6px; font-size: 11px;">
+                        Create Squad
+                    </button>
+                </form>
+            </div>
+            
+        </div>
+
+    </main>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/map.js"></script>
+    <script>
+        let missionsList = [];
+        let teamsList = [];
+        let selectedMission = null;
+        let gpsSimulationInterval = null;
+        let socket;
+        let routeTrailPolyline = null; // polyline layer to draw route
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'ngo') {
+                const session = await api.checkSession();
+                if (!session || session.user.role !== 'ngo') {
+                    window.location.href = '/';
+                    return;
+                }
+            }
+            
+            document.getElementById('ngo-org-name').innerText = `Org: ${user.name}`;
+            
+            // Initialize Leaflet map
+            initMap('map', (areaProperties) => {
+                console.log("Sector selected:", areaProperties);
+            });
+            
+            await refreshNgoData();
+            setupWebSockets();
+        });
+
+        async function refreshNgoData() {
+            try {
+                // 1. Fetch capacity workload status
+                const cap = await api.request('/api/ngo/capacity');
+                const percent = Math.min(100, Math.round((cap.active_missions_count / cap.max_concurrent_missions) * 100));
+                document.getElementById('ngo-capacity-ratio').innerText = `${cap.active_missions_count} / ${cap.max_concurrent_missions} active`;
+                const bar = document.getElementById('ngo-capacity-bar');
+                bar.style.width = `${percent}%`;
+                if (percent >= 80) bar.style.backgroundColor = "var(--color-critical)";
+                else if (percent >= 50) bar.style.backgroundColor = "var(--color-high)";
+                else bar.style.backgroundColor = "var(--color-info)";
+
+                // 2. Fetch NGO missions
+                missionsList = await api.request('/api/ngo/missions');
+                renderMissions(missionsList);
+                
+                // 3. Fetch NGO Teams
+                teamsList = await api.request('/api/ngo/teams');
+                renderTeams(teamsList);
+                
+                // If a mission is currently selected, refresh its chat logs
+                if (selectedMission) {
+                    refreshMissionChatLogs();
+                }
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        // Live Chat history retriever
+        async function refreshMissionChatLogs() {
+            if (!selectedMission) return;
+            try {
+                const msgs = await api.request(`/api/ngo/missions/${selectedMission.id}/messages`);
+                const history = document.getElementById('mission-chat-history');
+                history.innerHTML = '';
+                
+                if (msgs.length === 0) {
+                    history.innerHTML = '<div style="text-align:center; font-size:10px; color:var(--text-muted); padding:10px;">Chat room started. Type below to message dispatcher.</div>';
+                    return;
+                }
+                
+                msgs.forEach(m => {
+                    const bubble = document.createElement('div');
+                    bubble.className = m.sender_role === 'ngo' ? 'chat-bubble user' : 'chat-bubble ai';
+                    bubble.style.marginBottom = '6px';
+                    bubble.style.fontSize = '10px';
+                    bubble.innerHTML = `
+                        <strong>${m.sender_name}:</strong> ${m.message}
+                    `;
+                    history.appendChild(bubble);
+                });
+                history.scrollTop = history.scrollHeight;
+            } catch(e) {}
+        }
+
+        // Send a mission message
+        async function sendMissionMessage() {
+            if (!selectedMission) return;
+            const input = document.getElementById('mission-chat-input');
+            const text = input.value.trim();
+            if (!text) return;
+            
+            input.value = '';
+            try {
+                await api.request(`/api/ngo/missions/${selectedMission.id}/messages`, {
+                    method: 'POST',
+                    body: JSON.stringify({ message: text })
+                });
+                await refreshMissionChatLogs();
+            } catch(e) {}
+        }
+
+        function renderMissions(missions) {
+            const container = document.getElementById('ngo-missions-list');
+            container.innerHTML = '';
+            
+            const activeMissions = missions.filter(m => m.status !== 'completed');
+            if (activeMissions.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; color: var(--text-muted); padding: 30px;">
+                        <i class="fa-solid fa-clipboard-check" style="font-size: 24px; color: var(--color-low); margin-bottom: 8px;"></i>
+                        <p>No active missions assigned.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            activeMissions.forEach(m => {
+                const sos = m.sos_details;
+                
+                let controlsHtml = '';
+                if (m.status === 'assigned') {
+                    controlsHtml = `
+                        <button class="btn btn-primary" onclick="acceptMission(${m.id}, event)" style="margin-top: 8px; font-size: 11px; padding: 6px 12px;">
+                            Accept Mission
+                        </button>
+                    `;
+                } else if (m.status === 'accepted' || m.status === 'en-route' || m.status === 'on-site') {
+                    controlsHtml = `
+                        <div style="margin-top: 8px; border-top: 1px dashed var(--border-color); padding-top: 8px;">
+                            <div style="display:flex; gap: 6px; align-items:center;">
+                                <select class="form-control" id="status-select-${m.id}" style="padding: 4px; font-size: 11px;">
+                                    <option value="accepted" ${m.status === 'accepted' ? 'selected' : ''}>Work accepted</option>
+                                    <option value="en-route" ${m.status === 'en-route' ? 'selected' : ''}>En Route</option>
+                                    <option value="on-site" ${m.status === 'on-site' ? 'selected' : ''}>On Site</option>
+                                    <option value="completed">Completed (Rescue Done)</option>
+                                </select>
+                                <button class="btn btn-success" onclick="updateMissionStatus(${m.id}, event)" style="width:auto; padding:4px 8px; font-size:11px;">
+                                    Update
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                const card = document.createElement('div');
+                card.className = `glass-panel sos-card`;
+                card.style.borderLeftColor = m.status === 'completed' ? 'var(--color-success)' : 'var(--color-primary-light)';
+                card.style.cursor = 'pointer';
+                if (selectedMission && selectedMission.id === m.id) {
+                    card.style.borderColor = 'var(--color-primary-light)';
+                    card.style.background = '#EFF6FF';
+                }
+                
+                card.innerHTML = `
+                    <div class="sos-header" onclick="selectMission(${m.id})">
+                        <span class="sos-type"><i class="fa-solid fa-truck-pickup"></i> ${sos.emergency_type}</span>
+                        <span class="user-badge" style="background:rgba(59,130,246,0.1); color:#3B82F6; font-size:9px;">${m.status.toUpperCase()}</span>
+                    </div>
+                    <div onclick="selectMission(${m.id})">
+                        <div class="sos-details" style="font-size:11px;">
+                            <b>Victim:</b> ${sos.citizen_name}<br/>
+                            <b>Sector:</b> ${sos.area_name}<br/>
+                            <b>Trapped:</b> ${sos.people_affected} members | <b>Needs:</b> ${sos.medical_needs || 'None'}
+                        </div>
+                        <div style="font-size: 10px; color: var(--text-muted); border-top: 1px solid var(--border-color); padding-top: 4px; margin-top: 4px;">
+                            "${sos.description || 'No additional comment.'}"
+                        </div>
+                    </div>
+                    ${controlsHtml}
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        async function selectMission(missionId) {
+            selectedMission = missionsList.find(m => m.id === missionId);
+            renderMissions(missionsList);
+            
+            if (selectedMission) {
+                const sos = selectedMission.sos_details;
+                map.setView([sos.latitude, sos.longitude], 14.5);
+                
+                // Show recommendation and chat rooms
+                await loadAiRecommendation(sos.id);
+                document.getElementById('mission-chat-panel').style.display = 'flex';
+                await refreshMissionChatLogs();
+            }
+        }
+
+        async function loadAiRecommendation(sosId) {
+            const panel = document.getElementById('ngo-ai-rec-panel');
+            const text = document.getElementById('ai-rec-text');
+            panel.style.display = 'block';
+            text.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing recommendation...';
+            
+            try {
+                const res = await api.request('/api/ngo/ai/recommend', {
+                    method: 'POST',
+                    body: JSON.stringify({ sos_id: sosId })
+                });
+                text.innerHTML = `
+                    <b>Suggested Squad Members:</b> ${res.recommended_team_size} crew<br/>
+                    <b>Trauma Supplies:</b> ${res.critical_supplies}<br/>
+                    <i style="color:var(--text-muted); font-size:10px;">Rationale: ${res.rationale}</i>
+                `;
+            } catch(e) {
+                text.innerText = "Failed to load recommendation.";
+            }
+        }
+
+        async function acceptMission(missionId, event) {
+            event.stopPropagation();
+            try {
+                await api.request(`/api/ngo/missions/${missionId}/accept`, { method: 'POST' });
+                await refreshNgoData();
+            } catch(e) {
+                alert("Failed: " + e.message);
+            }
+        }
+
+        async function updateMissionStatus(missionId, event) {
+            event.stopPropagation();
+            const status = document.getElementById(`status-select-${missionId}`).value;
+            try {
+                await api.request(`/api/ngo/missions/${missionId}/status`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ status })
+                });
+                if (status === 'completed' && selectedMission && selectedMission.id === missionId) {
+                    selectedMission = null;
+                    document.getElementById('ngo-ai-rec-panel').style.display = 'none';
+                    document.getElementById('mission-chat-panel').style.display = 'none';
+                    stopGpsSimulation();
+                }
+                await refreshNgoData();
+            } catch(e) {
+                alert("Failed: " + e.message);
+            }
+        }
+
+        function renderTeams(teams) {
+            const listDiv = document.getElementById('ngo-teams-list');
+            const select = document.getElementById('sim-team-select');
+            listDiv.innerHTML = '';
+            select.innerHTML = '';
+            
+            if (teams.length === 0) {
+                listDiv.innerHTML = '<p style="text-align:center; font-size:11px; color:var(--text-muted); padding:10px;">No rescue squads registered.</p>';
+                return;
+            }
+            
+            updateTeamMarkers(teams);
+            
+            teams.forEach(t => {
+                const div = document.createElement('div');
+                div.style.padding = '6px';
+                div.style.borderBottom = '1px solid var(--border-color)';
+                div.style.fontSize = '11px';
+                div.style.display = 'flex';
+                div.style.justify = 'space-between';
+                div.style.alignItems = 'center';
+                
+                div.innerHTML = `
+                    <div>
+                        <b>${t.team_name}</b> (${t.members_count} crew)<br/>
+                        <span style="font-size:9px; color:var(--text-secondary);">
+                            GPS: ${t.current_lat !== null ? `${t.current_lat.toFixed(4)}, ${t.current_lng.toFixed(4)}` : 'OFFLINE'}
+                        </span>
+                    </div>
+                    <span class="user-badge" style="font-size:9px; background:rgba(31,138,112,0.1); color:var(--color-low);">
+                        ${t.status.toUpperCase()}
+                    </span>
+                `;
+                listDiv.appendChild(div);
+                
+                const opt = document.createElement('option');
+                opt.value = t.id;
+                opt.innerText = t.team_name;
+                select.appendChild(opt);
+            });
+        }
+
+        async function handleAddTeam(e) {
+            e.preventDefault();
+            const team_name = document.getElementById('team-name-input').value;
+            const members_count = parseInt(document.getElementById('team-members-input').value);
+            
+            try {
+                await api.request('/api/ngo/teams', {
+                    method: 'POST',
+                    body: JSON.stringify({ team_name, members_count })
+                });
+                document.getElementById('team-name-input').value = '';
+                await refreshNgoData();
+            } catch(e) {
+                alert("Failed: " + e.message);
+            }
+        }
+
+        // V2 Live GPS Simulation with breadcrumbs polyline trails on Leaflet map
+        async function startGpsSimulation() {
+            const teamId = document.getElementById('sim-team-select').value;
+            if (!teamId) {
+                alert("Please select a squad.");
+                return;
+            }
+            if (!selectedMission) {
+                alert("Please select an active target mission to calculate routing path.");
+                return;
+            }
+            
+            try {
+                // Clear old trail drawing if any
+                if (routeTrailPolyline) {
+                    map.removeLayer(routeTrailPolyline);
+                }
+                
+                // Fetch the V2 pre-calculated interpolated route trail coordinates
+                const res = await api.request(`/api/ngo/missions/${selectedMission.id}/route`);
+                const routeTrail = res.route_trail;
+                
+                document.getElementById('btn-start-sim').disabled = true;
+                document.getElementById('btn-stop-sim').disabled = false;
+                const statusDiv = document.getElementById('sim-status');
+                statusDiv.innerHTML = `<span style="color:var(--color-high);"><i class="fa-solid fa-compass fa-spin"></i> Driving GPS Route Trail...</span>`;
+                
+                let step = 0;
+                gpsSimulationInterval = setInterval(async () => {
+                    if (step >= routeTrail.length) {
+                        stopGpsSimulation();
+                        statusDiv.innerHTML = `<span style="color:var(--color-success); font-weight:700;"><i class="fa-solid fa-circle-check"></i> Arrived On Site!</span>`;
+                        return;
+                    }
+                    
+                    const coord = routeTrail[step];
+                    
+                    try {
+                        // POST coordinates to API which relays to dispatcher in real time
+                        await api.request(`/api/ngo/teams/${teamId}/location`, {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                latitude: coord.latitude,
+                                longitude: coord.longitude,
+                                status: 'active'
+                            })
+                        });
+                        
+                        // Draw polyline trail path on Leaflet map up to the current coordinate
+                        const passedPoints = routeTrail.slice(0, step + 1).map(pt => [pt.latitude, pt.longitude]);
+                        if (routeTrailPolyline) {
+                            map.removeLayer(routeTrailPolyline);
+                        }
+                        routeTrailPolyline = L.polyline(passedPoints, {
+                            color: '#7C3AED', // Purple trail line
+                            weight: 4,
+                            opacity: 0.8,
+                            dashArray: '5, 10'
+                        }).addTo(map);
+                        
+                        statusDiv.innerHTML = `<span style="color:var(--color-primary-light);"><i class="fa-solid fa-radio"></i> Route Step ${step + 1}/${routeTrail.length}</span>`;
+                        
+                        step++;
+                        await refreshNgoData();
+                    } catch(e) {
+                        console.error("GPS stream fail:", e);
+                    }
+                }, 2000);
+                
+            } catch(e) {
+                alert("Failed to initialize simulated routing trail: " + e.message);
+            }
+        }
+
+        function stopGpsSimulation() {
+            if (gpsSimulationInterval) {
+                clearInterval(gpsSimulationInterval);
+                gpsSimulationInterval = null;
+            }
+            if (routeTrailPolyline) {
+                map.removeLayer(routeTrailPolyline);
+                routeTrailPolyline = null;
+            }
+            document.getElementById('btn-start-sim').disabled = false;
+            document.getElementById('btn-stop-sim').disabled = true;
+            document.getElementById('sim-status').innerText = "Simulator idle.";
+        }
+
+        function setupWebSockets() {
+            socket = io('/');
+            
+            socket.on('connect', () => {
+                console.log("NGO connected to socket");
+                socket.emit('join_room', { room: 'ngo' });
+            });
+            
+            socket.on('sos_status_changed', (update) => {
+                refreshNgoData();
+            });
+            
+            socket.on('new_sos_request', () => {
+                refreshNgoData();
+            });
+
+            // WebSocket live message listener
+            socket.on('new_mission_message', (msg) => {
+                if (selectedMission && msg.mission_id === selectedMission.id) {
+                    refreshMissionChatLogs();
+                }
+            });
+            
+            socket.on('disconnect', () => {
+                console.log("NGO disconnected from socket");
+            });
+        }
+    </script>
+</body>
+</html>
