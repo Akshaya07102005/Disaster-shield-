@@ -189,6 +189,7 @@ const components = {
         } else if (user.role === 'ngo') {
             links = [
                 { label: "Dashboard", icon: "fa-gauge", path: "/ngo/dashboard.html" },
+                { label: "Mission Command", icon: "fa-earth-asia", path: "/ngo/index.html" },
                 { label: "Emergency Requests", icon: "fa-list-check", path: "/ngo/requests.html" },
                 { label: "Critical Cases", icon: "fa-triangle-exclamation", path: "/ngo/critical.html" },
                 { label: "Team Management", icon: "fa-users-gear", path: "/ngo/teams.html" },

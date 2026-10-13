@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emergency Requests — NGO Portal</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header class="app-navbar"></header>
+    
+    <div class="portal-layout">
+        <aside class="sidebar"></aside>
+        
+        <main class="portal-content">
+            <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <h2 style="font-size: 24px; font-weight: 800;"><i class="fa-solid fa-list-check" style="color: var(--color-info);"></i> Assigned Emergency Requests</h2>
+                    <p style="color: var(--text-secondary); font-size: 13px;">Review missions dispatched to your NGO fleet, acknowledge deployments, and log resolution status.</p>
+                </div>
+                <a href="/ngo/index.html" class="btn btn-secondary" style="font-size: 12px; padding: 8px 14px; width: auto;">
+                    <i class="fa-solid fa-earth-asia"></i> Open Live Command Map
+                </a>
+            </div>
+
+            <!-- Filters -->
+            <div class="glass-panel" style="padding:16px; margin-bottom:20px;">
+                <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
+                    <div class="form-group" style="margin-bottom:0; flex:1; min-width:180px;">
+                        <label class="form-label" style="font-size:10px;">Filter Status</label>
+                        <select class="form-control" id="filter-status" onchange="filterMissions()" style="padding:8px 12px; font-size:12px;">
+                            <option value="">All Statuses</option>
+                            <option value="assigned">Assigned</option>
+                            <option value="in_progress">In-Progress</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0; flex:1; min-width:180px;">
+                        <label class="form-label" style="font-size:10px;">Filter Urgency</label>
+                        <select class="form-control" id="filter-hazard" onchange="filterMissions()" style="padding:8px 12px; font-size:12px;">
+                            <option value="">All Hazards</option>
+                            <option value="Flood">Flood</option>
+                            <option value="Cyclone">Cyclone</option>
+                            <option value="Medical">Medical</option>
+                            <option value="Trapped">Trapped</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-panel" style="padding:20px;">
+                <div id="ngo-requests-table-container">
+                    <div style="text-align: center; color: var(--text-muted); padding: 40px;">
+                        <i class="fa-solid fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 10px;"></i>
+                        <p>Loading assigned missions queue...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script>
+        let allMissions = [];
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = api.getUser();
+            if (!user || user.role !== 'ngo') {
+                window.location.href = '/login.html?role=ngo';
+                return;
+            }
+            
+            components.renderNavbar("Assigned Requests");
+            components.renderSidebar("/ngo/requests.html");
+            
+            await loadMissions();
+        });
+
+        async function loadMissions() {
+            try {
+                allMissions = await api.request('/api/ngo/missions');
+                filterMissions();
+            } catch(e) {
+                console.error("Failed to load missions:", e);
+                document.getElementById('ngo-requests-table-container').innerHTML = `
+                    <div style="text-align: center; color: var(--color-critical); padding: 30px;">
+                        <i class="fa-solid fa-triangle-exclamation" style="font-size: 24px;"></i>
+                        <p style="margin-top: 8px;">Failed to load assigned requests: ${e.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        function filterMissions() {
+            const filterStatus = document.getElementById('filter-status').value;
+            const filterHazard = document.getElementById('filter-hazard').value;
+            
+            let filtered = allMissions;
+            if (filterStatus) {
+                filtered = filtered.filter(m => m.status.toLowerCase() === filterStatus.toLowerCase());
+            }
+            if (filterHazard) {
+                filtered = filtered.filter(m => m.sos_details && m.sos_details.emergency_type === filterHazard);
+            }
+
+            const cols = [
+                { title: "Mission ID", field: "id", render: (val) => `<b>#M-${val}</b>` },
+                { title: "Citizen", field: "sos_details", render: (val) => {
+                    if (!val) return 'N/A';
+                    return `<b>${val.citizen_name || 'Anonymous'}</b><br/><span style="font-size:10px; color:var(--text-muted);">${val.citizen_phone || ''}</span>`;
+                }},
+                { title: "Sector Area", field: "sos_details", render: (val) => val ? (val.area_name || 'Chennai Sector') : 'N/A' },
+                { title: "Hazard Type", field: "sos_details", render: (val) => {
+                    if (!val) return 'N/A';
+                    return `<span class="user-badge" style="background: rgba(220, 38, 38, 0.1); color: var(--color-critical);">${val.emergency_type || 'Emergency'}</span>`;
+                }},
+                { title: "Affected", field: "sos_details", render: (val) => val ? `${val.people_affected || 1} citizen(s)` : '1' },
+                { title: "Priority Score", field: "sos_details", render: (val) => {
+                    const score = val ? (val.priority_score || 0) : 0;
+                    let color = 'var(--color-low)';
+                    if (score >= 25.0) color = 'var(--color-critical)';
+                    else if (score >= 15.0) color = 'var(--color-high)';
+                    else if (score >= 5.0) color = 'var(--color-medium)';
+                    return `<span style="color:${color}; font-weight:800;">${score.toFixed(1)}</span>`;
+                }},
+                { title: "Mission Status", field: "status", render: (val) => {
+                    let badgeClass = 'role-gov';
+                    if (val === 'completed') badgeClass = 'role-citizen';
+                    else if (val === 'in_progress') badgeClass = 'role-ngo';
+                    return `<span class="user-badge ${badgeClass}" style="text-transform: uppercase;">${val.replace('_', ' ')}</span>`;
+                }},
+                { title: "Operations Action", field: "id", render: (val, row) => {
+                    if (row.status === 'assigned') {
+                        return `<button onclick="acceptMission(${val})" class="btn btn-primary" style="padding: 4px 10px; font-size:11px; width:auto; border-radius:4px;"><i class="fa-solid fa-play"></i> Accept & Dispatch</button>`;
+                    } else if (row.status === 'in_progress') {
+                        return `<div style="display:flex; gap:6px;">
+                            <a href="/ngo/map.html?mission_id=${val}" class="btn btn-secondary" style="padding: 4px 8px; font-size:10px; width:auto; border-radius:4px;"><i class="fa-solid fa-location-arrow"></i> GPS Track</a>
+                            <button onclick="completeMission(${val})" class="btn btn-primary" style="padding: 4px 8px; font-size:10px; width:auto; border-radius:4px; background:var(--color-low); border-color:var(--color-low);"><i class="fa-solid fa-check"></i> Complete</button>
+                        </div>`;
+                    } else {
+                        return `<span style="font-size: 11px; color: var(--color-low); font-weight:700;"><i class="fa-solid fa-circle-check"></i> Mission Resolved</span>`;
+                    }
+                }}
+            ];
+
+            components.renderDataTable('ngo-requests-table-container', cols, filtered);
+        }
+
+        async function acceptMission(missionId) {
+            try {
+                await api.request(`/api/ngo/missions/${missionId}/accept`, { method: 'POST' });
+                alert("Mission accepted! Squad dispatched to the sector.");
+                await loadMissions();
+            } catch(e) {
+                alert("Error: " + e.message);
+            }
+        }
+
+        async function completeMission(missionId) {
+            if (!confirm("Are you sure this rescue mission has been successfully completed?")) return;
+            try {
+                await api.request(`/api/ngo/missions/${missionId}/complete`, { method: 'POST' });
+                alert("Mission marked as successfully completed!");
+                await loadMissions();
+            } catch(e) {
+                alert("Error: " + e.message);
+            }
+        }
+    </script>
+</body>
+</html>
