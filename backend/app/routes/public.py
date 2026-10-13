@@ -71,5 +71,12 @@ def get_assistant_starter_questions():
     except Exception as e:
         return jsonify({"message": "Failed to load starter questions", "error": str(e)}), 500
 
+@public_bp.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({
+        "status": "healthy",
+        "service": "Disaster Shield AI"
+    }), 200
+
 
 

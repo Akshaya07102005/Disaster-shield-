@@ -20,6 +20,11 @@ def create_app(config_class=Config):
     # Initialize extensions
     CORS(app, supports_credentials=True)
     db.init_app(app)
+    with app.app_context():
+        try:
+            db.create_all()
+        except Exception as e:
+            app.logger.warning(f"Database table verification notice: {e}")
     
     jwt = JWTManager(app)
     
@@ -52,6 +57,10 @@ def create_app(config_class=Config):
             resp.headers['Content-Disposition'] = f'inline; filename="{filename}"'
             return resp
         return jsonify({"message": "Report PDF file not found on server."}), 404
+
+    @app.route('/health')
+    def health_check():
+        return jsonify({"status": "healthy", "service": "Disaster Shield AI"}), 200
 
     @app.route('/')
     def serve_index():
