@@ -116,7 +116,8 @@ const components = {
         if (window._socketInitialized || typeof io === 'undefined') return;
         try {
             const user = api.getUser();
-            const socket = io({
+            const socketUrl = (typeof api !== 'undefined' && api.getSocketUrl) ? api.getSocketUrl() : undefined;
+            const socket = io(socketUrl, {
                 reconnection: true,
                 reconnectionDelay: 1000,
                 reconnectionAttempts: Infinity

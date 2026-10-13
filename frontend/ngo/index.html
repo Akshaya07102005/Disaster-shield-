@@ -520,7 +520,8 @@
         }
 
         function setupWebSockets() {
-            socket = io('/');
+            const socketUrl = (typeof api !== 'undefined' && api.getSocketUrl) ? api.getSocketUrl() : undefined;
+            socket = io(socketUrl);
             
             socket.on('connect', () => {
                 console.log("NGO connected to socket");

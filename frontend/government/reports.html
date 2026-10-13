@@ -87,7 +87,8 @@
                     { title: "Compiled By", field: "generated_by_name" },
                     { title: "Generation Timestamp", field: "generated_at", render: (val) => new Date(val).toLocaleString('en-IN') },
                     { title: "Action", field: "filepath", render: (val) => {
-                        return `<a href="${val}" target="_blank" class="btn btn-secondary" style="padding: 4px 8px; font-size:11px; width:auto; border-radius:4px;"><i class="fa-solid fa-download"></i> Open PDF</a>`;
+                        const fullUrl = (val && val.startsWith('http')) ? val : `${api.getBackendUrl()}${val}`;
+                        return `<a href="${fullUrl}" target="_blank" class="btn btn-secondary" style="padding: 4px 8px; font-size:11px; width:auto; border-radius:4px;"><i class="fa-solid fa-download"></i> Open PDF</a>`;
                     }}
                 ];
                 

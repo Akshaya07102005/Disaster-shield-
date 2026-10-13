@@ -1,7 +1,16 @@
 // Shared API Wrapper for Disaster Shield AI
-const API_URL = ''; // Relative path since they are on the same port
+const RENDER_BACKEND_URL = 'https://disaster-shield-backend-u54q.onrender.com';
+
+// Intelligent API base URL detection:
+// - If running directly on Render or local Flask port 5000: relative URL '' is used
+// - If deployed on Vercel or running on another port: route to live Render backend URL
+const API_URL = (window.location.origin.includes('onrender.com') || window.location.port === '5000')
+    ? ''
+    : RENDER_BACKEND_URL;
 
 const api = {
+    getBackendUrl: () => API_URL || window.location.origin,
+    getSocketUrl: () => API_URL || window.location.origin,
     getToken: () => localStorage.getItem('access_token'),
     setToken: (token) => {
         localStorage.setItem('access_token', token);
